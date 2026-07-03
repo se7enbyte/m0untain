@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>m0untain — signal</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEJUlEQVR4nM2X3WsdRRiHn5nZ3bN7TtKmPaltPvolbWMSCq1NjcGvfogoSvHCCqKiBKV44U2tUkFFUUFQvPHCi/4DQhFsrbTUeiuiYAVtaVPSSAVrk5imyTl7ds/uzHhxEpvENImnJ9bf1bLMO79n3nnnS1CRBEwul1uJCvY7ytkjlNMGCGoja3V6PtXpUXTp42KxeGXSU0x+ZJcsf8hxvEOeF6xBCIzRNfKuSEoF1lIuly6lafnFcGzkJCAFQG5pfrfrBqcc1yOJS1prLQEBtkb2AsAqpYybCVSalEmS0oPFa39+I+rq6lZIt+4nz882RWHBAEqIWmV+uqy1ANrP1slyFF42SWGLtNI/4PlBcxKXFtUcYKJvlcQl4/lBs5X+ASmVuxeE1VqLxTSfCqG1FiCsVO5eRym1vlJwVtSu6OeTlcZolFLrJTdRaVJKbjJrdqLaqzMvFAqkaYqQsloAUVWklJLCeIFdu3eRz+eJowhZJcS/ipJSopQiDEM6Ojt4+JFH+eDDjxCA1rqq6VgQgBACay1RFHHt2ihb79xGvnEF/RcH2PP4Y7z5zruEYTitfc0AhJCkaYrjOLR3dNK1vZuW1tUMDw8jhOC1Vw7y5FNPs//Vg4yNjuJ5HnEcLxhENDS2WqkU5ShEzCgJKSVxHJPL5di2vZtnnutlSUMDL+/rJSknDA8P8cDO3dx7/w62buviq6NHuNjfx8ZN7Rz69BOCbBblOBg9/Vyx1uD5WYzWc2cgDIvkGxvpuquHQqFAKSrz/ttvMDQ4yNDgFZpbWnj+hZfY2NbBqa9P0tXdw6qmVjZsauP1t94jTRIK42NzZmLWDFhrMcaw/e57WLmqiVMnjnFHx2ZGr45w7uwvZHM5Wtes49nefaxddztgKYUhF/rO0d6xmePHvqC9czPZbI4jn3/Gjz98h+t5s2ZgVgAhJKvXrsMaw68X+/E8lyDIMDY2Ribjo5RiU3snV/74neaWNfTct5Nly/MTq8EgpeDk8S9ZtryRuvp6zp89w5mfTy8EQGGtIeP7WGspjo+T8X2isqZcTMBxwBgQAnREpYZTIAN+AHZiUxWCJfUBcXGEJEloal5NOY4olUKElFij/wZwps+IRQhBHEUABEFAGKds2VDPEztuI4qvr3UhK9eFyhI1GGOACl82I/n2zCgnvvdYujTL1ZHh69u2nb7zzwCYHEDFxFiDkoKr4ymn+8ZJtJ19357y01rwXMnlEV1JlNYox/mH8ZwAUztzHcFvgxEXLhUrRvMdXRNtHFeS9eWE742D5gSYhPBcge+58zWdEWcxCzhn5wWYhNA3SOHNqupztJYAizO0han6C0mNJKTWekBKZUGY/9DXSKms1npAGp0cBiuUUtYuUqFNlbUWpZQFK4xODt/yh8mtf5rxf3iccguf538Ba2wKR4VglmUAAAAASUVORK5CYII=">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* ——— Ayu Dark (sampled from source) ——— */
+    --bg:#0B0E14;
+    --bg-grain:#0D1017;
+    --panel:#0D1017;
+    --panel-2:#0A0D12;
+    --line:#171D28;
+    --line-soft:#12161F;
+    --ink:#BFBDB6;
+    --ink-mid:#8A9099;
+    --ink-dim:#565B66;
+    --accent:#E6B450;       /* ayu gold — brand accent */
+    --inbound:#AAD94C;      /* ayu lime — healthy / pass */
+    --outbound:#59C2FF;     /* ayu blue — outbound */
+    --block:#F07178;        /* ayu red — flood block */
+    --scan:#FFB454;         /* ayu orange — scan block */
+    --unique:#D2A6FF;       /* ayu purple — unique sources */
+    --glow:0 0 24px;
+    --radius:12px;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --ui:"Space Grotesk",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  *{scrollbar-width:thin;scrollbar-color:#33404f #080b10}
+  *::-webkit-scrollbar{width:10px;height:10px}
+  *::-webkit-scrollbar-track{background:#080b10;border-left:1px solid var(--line-soft)}
+  *::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#263241,#17202b);border:2px solid #080b10;border-radius:999px}
+  *::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#3a485a,#202b39)}
+  *::-webkit-scrollbar-corner{background:#080b10}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 500px at 78% -10%, #12202b 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--ui);
+    -webkit-font-smoothing:antialiased;
+    letter-spacing:.1px;
+    overflow:hidden;
+  }
+  /* faint scanline grain over everything, very subtle */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.035;
+    background-image:repeating-linear-gradient(0deg,#fff 0,#fff 1px,transparent 1px,transparent 3px);
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:18px;
+    padding:11px 18px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(18,25,34,.6),transparent);
+  }
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:15px;letter-spacing:.4px}
+  .brand .mark{
+    width:22px;height:22px;position:relative;flex:0 0 auto;
+  }
+  .brand .mark::before,.brand .mark::after{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    border:2px solid var(--inbound);
+  }
+  .brand .mark::after{inset:6px;border-color:var(--outbound);opacity:.7}
+  .brand .pulse{
+    position:absolute;left:9px;top:9px;width:4px;height:4px;border-radius:50%;
+    background:var(--inbound);box-shadow:var(--glow) var(--inbound);
+    animation:beat 1.8s ease-in-out infinite;
+  }
+  @keyframes beat{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+  .brand small{color:var(--ink-dim);font-weight:500;font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+  .brand .logo{height:26px;width:auto;display:block;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
+  .brand .livedot{width:6px;height:6px;border-radius:50%;background:var(--inbound);box-shadow:var(--glow) var(--inbound);animation:beat 1.8s ease-in-out infinite}
+  .top-stats{display:flex;gap:26px;margin-left:auto;align-items:center}
+  .tstat{display:flex;flex-direction:column;line-height:1.1}
+  .tstat b{font-family:var(--mono);font-size:17px;font-weight:700}
+  .tstat span{font-size:10px;color:var(--ink-dim);letter-spacing:1.2px;text-transform:uppercase;margin-top:3px}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--inbound);box-shadow:var(--glow) var(--inbound);display:inline-block;margin-right:7px}
+  .status{display:flex;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink-mid);
+    border:1px solid var(--line);border-radius:999px;padding:7px 13px}
+  .iconbtn{width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:#0d121a;color:var(--ink-mid);cursor:pointer;display:grid;place-items:center;position:relative}
+  .iconbtn:hover{color:var(--accent);border-color:#3b4654;background:#121923}
+  .iconbtn svg{width:16px;height:16px}
+  .notice-badge{position:absolute;right:-4px;top:-5px;min-width:17px;height:17px;border-radius:9px;padding:0 4px;background:var(--block);color:#090b0f;font:700 10px/17px var(--mono);display:none}
+  .notice-badge.show{display:block}
+  .nav-tabs{display:flex;gap:6px;margin-left:10px;padding:4px;border:1px solid var(--line);border-radius:999px;background:rgba(7,10,15,.45)}
+  .nav-tab{border:0;background:transparent;color:var(--ink-dim);font:700 10px var(--mono);letter-spacing:1px;text-transform:uppercase;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s ease}
+  .nav-tab:hover{color:var(--ink-mid);background:#101722}
+  .nav-tab.active{color:#09110b;background:var(--inbound);box-shadow:0 0 18px rgba(170,217,76,.26)}
+  .view{height:calc(100vh - 62px);display:none}
+  .view.active{display:block}
+
+  /* ---------- grid ---------- */
+  .grid{
+    display:grid;gap:10px;padding:12px 18px 18px;
+    grid-template-columns:repeat(12,1fr);
+    grid-template-rows:minmax(118px,132px) minmax(0,1fr);
+    height:100%;
+    overflow:hidden;
+    align-content:stretch;
+  }
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:11px 12px 11px;position:relative;overflow:hidden;
+    display:flex;flex-direction:column;min-height:0;
+    transition:border-color .18s ease,transform .22s ease,box-shadow .22s ease;
+  }
+  .panel:hover{border-color:#26313f}
+  .panel:not(.focused):hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(0,0,0,.22)}
+  .panel.focused{position:fixed!important;z-index:2600;margin:0!important;grid-column:auto!important;transition:left .34s cubic-bezier(.22,1,.36,1),top .34s cubic-bezier(.22,1,.36,1),width .34s cubic-bezier(.22,1,.36,1),height .34s cubic-bezier(.22,1,.36,1),border-color .2s ease,box-shadow .34s ease,opacity .22s ease;box-shadow:0 34px 110px rgba(0,0,0,.72),0 0 0 1px rgba(170,217,76,.08);border-color:#3d4c5d}
+  .panel.focused.closing{transition:left .3s cubic-bezier(.45,0,.55,1),top .3s cubic-bezier(.45,0,.55,1),width .3s cubic-bezier(.45,0,.55,1),height .3s cubic-bezier(.45,0,.55,1),box-shadow .28s ease,opacity .24s ease;box-shadow:0 12px 34px rgba(0,0,0,.24);opacity:.94}
+  .panel.focus-cooldown:hover{transform:none!important;box-shadow:none!important}
+  .focus-placeholder{border:1px solid transparent;border-radius:var(--radius);min-height:0;pointer-events:none;opacity:0}
+  .focus-close{display:none;position:absolute;right:12px;top:10px;z-index:4;width:28px;height:28px;border-radius:9px;border:1px solid #2b3644;background:#0a0e14;color:var(--ink-mid);cursor:pointer;font-size:18px;line-height:24px}
+  .panel.focused .focus-close{display:grid;place-items:center}
+  .focus-scrim{position:fixed;inset:0;background:rgba(3,5,8,.68);backdrop-filter:blur(6px);z-index:2500;opacity:0;pointer-events:none;transition:opacity .28s ease,backdrop-filter .28s ease}
+  .focus-scrim.show{opacity:1;pointer-events:auto}
+  .p-head{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+  .p-title{font-size:12.5px;font-weight:600;letter-spacing:.3px}
+  .p-title{position:relative;padding-left:11px}
+  .p-title::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:3px;background:var(--accent);opacity:.8}
+  .p-title .ey{font-family:var(--mono);font-size:10px;color:var(--ink-dim);letter-spacing:1.5px;display:block;text-transform:uppercase;margin-bottom:3px;font-weight:500}
+  .legend{display:flex;gap:12px;margin-left:auto;align-items:center}
+  .lg{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--ink-mid);font-family:var(--mono)}
+  .lg i{width:9px;height:2.5px;border-radius:2px;display:inline-block}
+  .detach{
+    margin-left:8px;background:transparent;border:1px solid var(--line);
+    color:var(--ink-dim);border-radius:8px;width:26px;height:26px;cursor:pointer;
+    display:grid;place-items:center;transition:.15s;flex:0 0 auto;
+  }
+  .detach:hover{color:var(--ink);border-color:#33404f;background:#141c26}
+  .detach svg{width:13px;height:13px}
+
+  /* spans */
+  .col-12{grid-column:span 12}.col-8{grid-column:span 8}.col-6{grid-column:span 6}
+  .col-4{grid-column:span 4}.col-5{grid-column:span 5}.col-7{grid-column:span 7}.col-3{grid-column:span 3}
+  @media(max-width:1000px){.col-8,.col-6,.col-4,.col-5,.col-7,.col-3{grid-column:span 12}}
+
+  .body{flex:1;min-height:0;display:flex;flex-direction:column}
+  canvas{width:100%;height:100%;display:block}
+  .metric .chart-wrap{height:78px;min-height:62px}
+  .chart-wrap{position:relative;flex:1;min-height:0}
+  .readout{position:absolute;top:2px;right:4px;font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+  .chart-tip{position:absolute;z-index:3;pointer-events:none;display:none;min-width:132px;padding:8px 10px;border:1px solid #303b49;border-radius:8px;background:rgba(8,11,16,.96);box-shadow:0 10px 30px rgba(0,0,0,.35);font:10.5px/1.55 var(--mono);color:var(--ink-mid);transform:translate(10px,-50%)}
+  .chart-tip.show{display:block}.chart-tip b{display:block;color:var(--ink);font-weight:600;margin-bottom:3px}.chart-tip span{display:flex;justify-content:space-between;gap:18px}.chart-tip i{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px}
+
+  /* big number */
+  .bignum{font-family:var(--mono);font-weight:700;font-size:34px;line-height:1;letter-spacing:-1px}
+  .bignum.warn{color:var(--block)}
+  .sub{color:var(--ink-dim);font-size:11px;font-family:var(--mono);letter-spacing:.5px;margin-top:8px}
+
+  /* block list */
+  .blocklist{display:flex;flex-direction:column;gap:6px;overflow:auto;flex:1;margin-top:2px}
+  .brow{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;
+    font-family:var(--mono);font-size:11px;padding:7px 9px;border-radius:9px;
+    background:var(--panel-2);border:1px solid var(--line-soft)}
+  .brow .ip{color:var(--ink)}
+  .tag{font-size:9.5px;padding:2px 7px;border-radius:6px;letter-spacing:.5px;text-transform:uppercase}
+  .tag.rl{color:var(--block);background:rgba(255,92,108,.12);border:1px solid rgba(255,92,108,.3)}
+  .tag.scan{color:var(--scan);background:rgba(245,179,60,.12);border:1px solid rgba(245,179,60,.3)}
+  .ttl{color:var(--ink-dim);font-size:11px;min-width:38px;text-align:right}
+  .empty{color:var(--ink-dim);font-family:var(--mono);font-size:12px;text-align:center;padding:24px 0}
+
+  /* top sources bars */
+  .talker{display:grid;grid-template-columns:120px 1fr 42px;gap:10px;align-items:center;margin-bottom:7px;font-family:var(--mono);font-size:11px}
+  .talker .bar{height:8px;border-radius:5px;background:var(--line);overflow:hidden}
+  .talker .bar>i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--outbound),var(--inbound))}
+  .talker.flag .bar>i{background:linear-gradient(90deg,var(--scan),var(--block))}
+  .talker .n{color:var(--ink-mid);text-align:right}
+
+  /* toggles */
+  .ctl{display:flex;align-items:center;justify-content:space-between;padding:6px 3px;border-bottom:1px solid var(--line-soft)}
+  .ctl:last-child{border-bottom:0}
+  .ctl .lab b{font-size:12px;font-weight:600}
+  .ctl .lab small{display:block;color:var(--ink-dim);font-family:var(--mono);font-size:9.6px;margin-top:2px}
+  .switch{width:39px;height:22px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:.2s;flex:0 0 auto;border:1px solid var(--line)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--ink-dim);transition:.2s}
+  .switch.on{background:rgba(63,214,180,.22);border-color:rgba(63,214,180,.5)}
+  .switch.on::after{left:19px;background:var(--inbound);box-shadow:var(--glow) var(--inbound)}
+  .thr{font-family:var(--mono);font-size:10px;color:var(--ink-mid)}
+  .tunables{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px}
+  .mini-field{border:1px solid var(--line-soft);background:#090d13;border-radius:8px;padding:6px}
+  .mini-field span{display:block;color:var(--ink-dim);font:8px var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini-field input{width:100%;background:transparent;border:0;color:var(--ink);font:11px var(--mono);outline:0}
+  .mini-actions{display:flex;justify-content:flex-end;margin-top:6px}
+
+  .app-list{display:flex;flex-direction:column;gap:7px;overflow:auto;min-height:0}
+  .qrow{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center;padding:9px;border:1px solid var(--line-soft);border-radius:10px;background:#090d13}
+  .qrow.wait{border-color:rgba(255,180,84,.38);background:rgba(255,180,84,.055)}
+  .qname{font-size:12px;font-weight:650;color:var(--ink)}
+  .qpath{font:9.5px/1.35 var(--mono);color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px}
+  .qmeta{display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap}
+  .pill{font:9px var(--mono);text-transform:uppercase;letter-spacing:.6px;border:1px solid var(--line);border-radius:999px;padding:2px 6px;color:var(--ink-mid)}
+  .pill.hot{color:var(--block);border-color:rgba(240,113,120,.45);background:rgba(240,113,120,.08)}
+  .pill.wait{color:var(--scan);border-color:rgba(255,180,84,.4);background:rgba(255,180,84,.08)}
+  .qactions{display:flex;gap:6px;align-items:center}
+  .tinybtn{border:1px solid var(--line);border-radius:8px;background:#101722;color:var(--ink-mid);font:600 10px var(--ui);padding:6px 8px;cursor:pointer;white-space:nowrap}
+  .tinybtn:hover{border-color:#3a4655;color:var(--ink)}
+  .tinybtn.allow{color:var(--inbound);border-color:rgba(170,217,76,.35);background:rgba(170,217,76,.08)}
+  .tinybtn.danger{color:var(--block);border-color:rgba(240,113,120,.35);background:rgba(240,113,120,.08)}
+  .tinybtn:disabled{opacity:.38;cursor:not-allowed;filter:saturate(.55)}
+
+  .conn-page{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;padding:12px 18px 18px;overflow:hidden}
+  .conn-metrics{display:grid;grid-template-columns:1.15fr repeat(4,1fr);gap:10px}
+  .conn-card{min-height:86px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--panel),var(--panel-2));padding:13px;position:relative;overflow:hidden}
+  .conn-card small{font:9px var(--mono);letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-dim)}
+  .conn-card b{display:block;margin-top:8px;font:700 28px/1 var(--mono);color:var(--ink)}
+  .conn-card i{position:absolute;right:12px;bottom:10px;font:10px var(--mono);color:var(--ink-dim);font-style:normal}
+  .conn-card.live-card{display:grid;grid-template-columns:72px minmax(0,1fr);gap:12px;align-items:end}
+  .conn-card.live-card b{font-size:24px;color:var(--inbound)}
+  .conn-spark{height:48px;min-width:0;align-self:center;position:relative}
+  .conn-spark canvas{display:block;width:100%;height:48px}
+  .conn-main{min-height:0;display:grid;grid-template-columns:2fr 1fr;gap:10px}
+  .conn-list{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
+  .conn-row{display:grid;grid-template-columns:1.05fr .8fr .7fr auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line-soft);border-radius:10px;background:#090d13}
+  .conn-row.block{border-color:rgba(240,113,120,.38);background:rgba(240,113,120,.055)}
+  .conn-app b,.conn-remote b{display:block;font-size:12px;color:var(--ink)}
+  .conn-app small,.conn-remote small,.conn-meta small{display:block;font:9.5px/1.35 var(--mono);color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .conn-meta{font:10px var(--mono);color:var(--ink-mid)}
+  .conn-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+  .conn-side{display:grid;grid-template-rows:1fr 1fr;gap:10px;min-height:0}
+  .mini-list{overflow:auto;min-height:0;display:flex;flex-direction:column;gap:7px}
+  .mini-row{display:flex;justify-content:space-between;gap:10px;padding:8px 9px;border:1px solid var(--line-soft);border-radius:9px;background:#090d13;font:10.5px var(--mono);color:var(--ink-mid)}
+  .app-tree{display:flex;flex-direction:column;gap:8px}
+  .app-section{display:flex;flex-direction:column;gap:6px}
+  .app-section-title{display:grid;grid-template-columns:1fr auto;align-items:center;padding:6px 3px 2px;color:var(--ink-dim);font:10px var(--mono);letter-spacing:1.2px;text-transform:uppercase}
+  .app-section-title b{color:var(--ink-mid);font:11px var(--mono)}
+  .tree-app{border:1px solid var(--line-soft);border-radius:12px;background:linear-gradient(180deg,#090d13,#080b10);overflow:hidden;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+  .tree-app:hover{border-color:#243142}
+  .tree-app.selected{border-color:rgba(230,180,80,.55);box-shadow:0 0 0 1px rgba(230,180,80,.12),0 0 22px rgba(230,180,80,.08)}
+  .tree-app.has-block{border-color:rgba(240,113,120,.28)}
+  .tree-app.allowed{border-color:rgba(170,217,76,.24)}
+  .tree-app.blocked{border-color:rgba(240,113,120,.35);background:linear-gradient(180deg,rgba(240,113,120,.08),#080b10)}
+  .tree-app.pending{border-color:rgba(255,180,84,.42);background:linear-gradient(180deg,rgba(255,180,84,.08),#080b10)}
+  .tree-head{display:grid;grid-template-columns:27px 32px minmax(0,1fr) auto;gap:9px;align-items:center;padding:10px;cursor:pointer}
+  .tree-toggle{width:24px;height:24px;border:1px solid var(--line);border-radius:8px;background:#0e141d;color:var(--ink-mid);display:grid;place-items:center;font:700 12px var(--mono);transition:transform .18s ease,border-color .18s ease,color .18s ease}
+  .tree-app.open .tree-toggle{transform:rotate(90deg);border-color:rgba(230,180,80,.35);color:var(--accent)}
+  .tree-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:rgba(89,194,255,.08);border:1px solid rgba(89,194,255,.18);color:var(--outbound);font:800 10px var(--mono);letter-spacing:.2px}
+  .tree-app.allowed .tree-icon{background:rgba(170,217,76,.10);border-color:rgba(170,217,76,.20);color:var(--inbound)}
+  .tree-app.blocked .tree-icon{background:rgba(240,113,120,.11);border-color:rgba(240,113,120,.22);color:var(--block)}
+  .tree-app.pending .tree-icon{background:rgba(255,180,84,.11);border-color:rgba(255,180,84,.24);color:var(--scan)}
+  .tree-name{min-width:0}.tree-name b{display:block;color:var(--ink);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tree-name small{display:block;margin-top:3px;color:var(--ink-dim);font:9.5px/1.35 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tree-kpis{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+  .tree-children{border-top:1px solid var(--line-soft);padding:7px 9px 9px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,.12)}
+  .tree-conn{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px;border:1px solid var(--line-soft);border-radius:9px;background:#080c12}
+  .tree-conn.block{border-color:rgba(240,113,120,.35);background:rgba(240,113,120,.055)}
+  .tree-conn b{display:block;color:var(--ink);font:11px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tree-conn small{display:block;margin-top:3px;color:var(--ink-dim);font:9px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tree-empty{padding:8px;color:var(--ink-dim);font:10px var(--mono)}
+  .app-detail{overflow:auto;min-height:0;display:flex;flex-direction:column;gap:9px}
+  .detail-empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--ink-dim);font:12px var(--ui)}
+  .detail-hero{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;align-items:center;padding:10px;border:1px solid var(--line-soft);border-radius:11px;background:#090d13}
+  .detail-icon{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;color:var(--accent);background:rgba(230,180,80,.11);border:1px solid rgba(230,180,80,.24);font:700 16px var(--mono)}
+  .detail-title{min-width:0}.detail-title b{display:block;color:var(--ink);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-title small{display:block;color:var(--ink-dim);font:9.5px/1.4 var(--mono);overflow-wrap:anywhere;margin-top:3px}
+  .detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.detail-stat{padding:8px;border:1px solid var(--line-soft);border-radius:9px;background:#080c12}.detail-stat small{display:block;color:var(--ink-dim);font:8.5px var(--mono);letter-spacing:.8px;text-transform:uppercase}.detail-stat b{display:block;color:var(--ink);font:13px var(--mono);margin-top:5px}
+  .detail-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  .detail-section{border:1px solid var(--line-soft);border-radius:10px;background:#090d13;padding:9px}.detail-section h4{margin:0 0 7px;font:10px var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--ink-dim)}
+  .detail-endpoint{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line-soft);font:10px var(--mono);color:var(--ink-mid)}.detail-endpoint:first-of-type{border-top:0}.detail-endpoint span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-endpoint b{color:var(--ink)}
+
+  .solo{padding:16px 22px}
+  .solo .panel{min-height:calc(100vh - 32px)}
+  .overlay{position:fixed;inset:0;z-index:2000;background:rgba(3,5,8,.72);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;padding:24px}.overlay.show{display:flex}
+  .dialog{width:min(620px,100%);max-height:calc(100vh - 48px);overflow:auto;background:linear-gradient(180deg,#111722,#0b0f16);border:1px solid #293341;border-radius:15px;box-shadow:0 28px 90px rgba(0,0,0,.55);padding:22px}.dialog.wide{width:min(760px,100%)}
+  .dialog-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}.dialog-head>div:first-child{flex:1}.dialog-head .ey{font:10px var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--accent)}.dialog-head h2{font-size:19px;margin:5px 0 0;color:var(--ink)}
+  .closebtn{border:0;background:transparent;color:var(--ink-dim);font-size:22px;cursor:pointer}.closebtn:hover{color:var(--ink)}
+  .app-card{display:grid;grid-template-columns:42px 1fr;gap:12px;padding:13px;border:1px solid var(--line);border-radius:11px;background:#0a0e14}.app-icon{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;background:rgba(230,180,80,.12);border:1px solid rgba(230,180,80,.25);color:var(--accent);font:700 17px var(--mono)}
+  .app-title{font-weight:650;color:var(--ink)}.app-path{font:10px/1.5 var(--mono);color:var(--ink-dim);overflow-wrap:anywhere;margin-top:3px}
+  .connection-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:13px 0}.conn-cell{padding:10px;border:1px solid var(--line);border-radius:9px;background:#0a0e14}.conn-cell small{display:block;color:var(--ink-dim);font:9px var(--mono);text-transform:uppercase;letter-spacing:1px}.conn-cell b{display:block;margin-top:5px;font:12px var(--mono);color:var(--ink-mid);overflow:hidden;text-overflow:ellipsis}
+  .warning-note{font:10.5px/1.55 var(--mono);color:var(--scan);padding:10px 12px;border-left:3px solid var(--scan);background:rgba(255,180,84,.07);margin:12px 0}
+  .field{margin:15px 0}.field label{display:block;font-size:11px;color:var(--ink-mid);margin-bottom:7px}.field select{width:100%;background:#090d13;border:1px solid #293341;color:var(--ink);border-radius:9px;padding:10px;font:12px var(--mono)}
+  .remember{display:flex;align-items:center;gap:8px;color:var(--ink-mid);font-size:12px;margin:12px 0}.remember input{accent-color:var(--accent)}
+  .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.btn{border:1px solid var(--line);border-radius:9px;padding:10px 15px;background:#111722;color:var(--ink);cursor:pointer;font:600 12px var(--ui)}.btn:hover{border-color:#3a4655}.btn.allow{background:rgba(170,217,76,.12);border-color:rgba(170,217,76,.45);color:var(--inbound)}.btn.block{background:rgba(240,113,120,.12);border-color:rgba(240,113,120,.5);color:var(--block)}
+  .setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 2px;border-bottom:1px solid var(--line-soft)}.setting-row b{font-size:13px}.setting-row small{display:block;color:var(--ink-dim);font:10.5px/1.45 var(--mono);margin-top:4px}.setting-row input{width:18px;height:18px;accent-color:var(--accent)}
+  .rules-title{font:10px var(--mono);letter-spacing:1.3px;text-transform:uppercase;color:var(--ink-dim);margin:22px 0 9px}.rule-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px;border:1px solid var(--line-soft);border-radius:9px;margin-top:7px;background:#090d13}.rule-row b{font-size:12px}.rule-row small{display:block;color:var(--ink-dim);font:9.5px var(--mono);margin-top:2px;overflow-wrap:anywhere}.rule-status{font:10px var(--mono);text-transform:uppercase}.rule-status.allow{color:var(--inbound)}.rule-status.quarantine{color:var(--block)}.rule-remove{background:transparent;border:0;color:var(--ink-dim);cursor:pointer;font-size:17px}.rule-remove:hover{color:var(--block)}
+</style>
+</head>
+<body>
+
+<div class="topbar" id="topbar">
+  <div class="brand">
+    <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA0MAAAGWCAYAAAC6rFhaAAA2YElEQVR4nO3d2ZIbSbog5j+Z4FKsYnV1TevMSDJdSHd6/4eZuzFpVukcdXctXHODLpBBREYCic09fInvM6MRZCIDDo8Id//Dt6t//e1LAMCM1o9/XxVNBQCLt1qv14ffBQBpqHQAqMar0gkAYDGmgdA6Im5KJAQAIgRDAMxjX4/Q64i4nTMhADBYGSUHQGaHaprVLKkAgImV4dsAZHQ3er2O/YsmvPQzAMjCMDkAcvkcEdePr48JdjydA2BWgiEAcvnh8e+7OL7XR0AEwGzMGQIgtU8R8X7071PnBBkyB8AszBkCILUhELokqHkIoxcAyExFA0BK69Hfl/TuXIU9iADITDAEQCrjoQYphrm9TnAMANjLnCEAUshVm5g/BEA2eoYAuFTux2oe2wGQhQUUALjEXJWIHiIAktMzBMC55n6a5ukdAEmZMwTAOUrVHnqIAEhGzxAApyr9GK305wPQCXOGADhFLZWGHiIALraqpVYDoHo1VBkPYVQDAImsqqjaAKjdbekEPBoHQnqHALiIp2sAHGNVOgF7eKQHwNkEQwAcUnvAUXv6AKjUaq0OAWC/VioJQ+YAOJk5QwDs01oNcRf1DucDoEKGyQGwS0uB0P3j39dRz0IPADRAMATA1DmB0FWUG6Z2HduASM8QAEczZwiAsVYrhevYzhsyfwiAo5gzBMDg3BqhlsBjnA4BEQAHGSYHQES6QGgakJRU+vMBqJxgCIBcPUI19MwIiADYa6WWAFi0r6PXpyxNXUOg85LxMDlD5gDYaRVr4RDAQn2OiLejf78UCI0DpWN6hIbKpdTeP9M0CogAeMYwOYDl+uGE954b0NS01LWnfwA8YZgcwDLlXjmuVI/QLrcR8frxtR4iAL7TMwSwPHMsof368Ftm8zo2wdngft8bAVgWc4YAlqX1vYTONe6l8iAQgIhQIQAsyVIDoV08CQTAnCGAhSgRCI1XlauR+UMAC6dnCKB/eoT2qzlYAyCzlWoAoGunlPLjnpIlBEIDPUQAC7XyUAygW6cU8OOlsFOutlb7ULmBgAhggcwZAujTKcX7TUS8Gf27lv2B5iYgAlgYc4YA+nPqc65xIJQjGPiY4Zi53JZOAADzMWcIgEGuXpEP0cZQuYjl9ooBLJI5QwB9sXLc5QyXA1gIc4YA+lFzIDSdl1Q7ARHAApgzBNCHIRB6OPH35mrwv53pc1LyvBCgc+YMAbRvXJKf8pCrVM/HfURcF/rsU+khAujYai0aAmhZzUPj9mklEBoIiAA6ZZgcQLtaC4RaDig8OQTokGAIoE2tBUI9uCudAADSMmcIoD3nltxK/PPcxWb/oevYbMr6umxyAEjF0toAbbmk2K5hNMBVtBeUrWK7NLhNWQE6YtNVgHZcUmAbHneZ8R5JFlQA6EQNTwkBOOzU/YPGNNzTWU/+BqBh5gwB1O9rnB/Q1BgItThUbjDOTz1EAI0zZwigbvdxfi9+rQ31r6UTkJCACKBh5gwB1O2UQGjcMK+5gf62dAISExABNMqcIYB6nfq0amiQf0udkIRuSicgE08WARpkzhBAnS4pnd8lS0V6Pe/Ro4cIoDHmDAHUp9cltHutcoZNWQFojGFyAHUZAoZzltKuORDq2SosuQ3QJAsoANRjXCCf+rCq9kBoHOT1+CBuWC58/DcAlVutxUIANeh1aFzEZUFeS+xBBNCYnislgFb0HAgtmceNAJUTDAGU1XsgtPSAYOnfH6Bq5gwBlHNJAdzCfj0qmA1D5gAqZc4QQBm3F/zuOiLepkoIsxAQAVTIMDmA+X2Ny/alaaHs9qgNgOq1UKEC9Gbo1TknYGihd2H8vS7pAeuNABGgMoIhgHmNG8SnBjYtBEJj9xHxunQiKiMgAqjIam3SEMBcel85LuLpd7wuloq6mT8EUAk9QwDzWEIgxPE8iQSogGAIIL+lBEIa+KeRXwCFCYYA8lpKg3cp3zM1+QZQkDlDAPlcWsC21CvE+cwhAihEzxBAHksKhDxVu5w8BChAMASQnkCIc9yXTgDA0qzUYgBJXbrJaEuBEGl8i81GvB5QAsxs5ZkeQDKfI2J1we+3FgipQdJ4O3pt/hDAjFbqMoBkfrjgdzWAGQiIAGaiSx4gjaXsJTTwJC0v+QswA3OGAC53SVH6MVkq5qPqmIceIoDMzBkCuMwlpeh9RHxIlRC6JCACyMicIYDzXVqAXrLYQikqjfkJiAAyMWcI4DxDUPD5zN9vsXFrH5xyvpZOAECPzBkCON246Hx/xu+3GAhFeIBW0tvDbwHgVOYMAZzm0lKz1UBIbVGe4XIAiXnKB3C8pQZCn0ongO8EpQAJWUAB4DhLDYQizhsKSD56iAASMWcI4LAlT15XTdRJQASQgDlDAC9bco8QdRMQAVzInCGA/R5KJ6Awj8vq5xwBXGC1Vo4C7HIflz91b/mpvcqhHfcRcV06EQAt0jMEsNul5WPLgRBteRVW/AM4izlDAM8tfZ6QmqE9VvwDOIOeIYCnlh4I3ZdOAGcTxAKcyJwhgK2lB0IRHpK1zgpzACdQ6QFsCIT0LPTCeQQ4kjlDAAKhGkx7NB5iu0Kamup0eogAjrAqnQCAwi5taH9LkorySgccV3teD/8unb4WCYgADlipXYAFS1EEvktwjNJqqgr2Nd4FRMcb7zskIAJ4wUrdAixUisJPIzOdY/LyW0S8zZ2QDlxHxG1EvH78t4AIYA9zhoAlSrF8dC+NyxpqgWPz8l3Ukd4WvJ78W0AEsINhcsDS3MV2Jc3xcKJT9NKoLF0FfIvThxkaLne+r9HHsE6AZCygACzN9Z7Xx+olECrtknwUEJ3mJiLehCGGAM+YMwQsiSW0t0oW/inyUUB0vDej14bLAYyYMwQsxaWlXYp5RrUoVfKnboQLiM4jIAJ4ZM4QsASXFnU3YYjRpXI1vgVE5xEQAcR2EjFArwRCT80dONxH/ka3Rv15BJHA4llAAejZpY292+grEJqbIKV+eoiARVvF2oMhoEspCrc3h9/SlDkL/Lkb2NPhcjZoPZ6ACFgsc4aAHqUo2nprHM5V3JfMt3FAJBA6jYAIWCRzhoDeCITKqSHfakhDqzwfBRZHMAT0RCC0W+5G7kPUlW81pQWAipkzBPTiNsExemxEpyzkdw2lqjXPLLl9HsPlgEUxZwjowefYro75EOf1ej+kS06X7uLpCqRfIuJ9obQcS0B0HgERsBiW1oZlGRqGPTV0biLi9ePraYP9WF8j4odkKapHykBgnK8tXT8CovMIiIBFMGcIluH/jqcNwnVsAoceDIHQOs5/wNNjIPQ10zFbbCDflE5AowSRQPdWijro3l1EXO/4/+to/+nvuAQ79ntMe49a/v4vSb20dMv59DY07M/VehkB8KLVWv0APRuv8rVvLk2rQ+fOLbyWEAhdUrBPr5NvEfHusuRUwXC504yDIAER0C1zhqBf04bfoWGxLTV4LKGdz/g66S2PBETHm577lsoHgKOZMwR9OrfB18JcIo3Zl6XIn/vot+Hb6/eaQ4rl6wGqsrLNEHTnnLt6PDSq5rlESqyX6TE7jh6i8xhNAnRnpT6Arpx7Q++bS1RTwzhlYWV1sd1qOt+5CYjOU1u5AHARw+SgHzkaduuoI3BI/d1Sr7RWg0vy6C6W2cBd4ndOQRAJdEOXN/QhZ+PkdZR9GjzdH0kD9rlL5nnJT87hXgS6YM4QtO2PiPgw02etYzOxfs6HKNMS6pLGV8+Nt137SB3Sa16cynC58/V8TwELYZgctOtTzBcIDYbFFeaQ+nN6bbQdyqddKwT2mhfnkh/nE0gCTbOAArTpNsoOc839RNjQuON8O+I9V7G9Vu5iM+yR5/QQnc89CjTLnCFoTy0NtiEdqRtB95N/pz5+LfmXwpsT3quxepiA6Hzj5fl5SrAIFTNnCNpS4x2bsqL/GtsGVa7GVS8NtlOuBQ2x4wmIznMVmwcZ58xf69l69Lf7ECrUS6MAluDSBlruYW1/JDjOsOT1XSifUrgKDTDyG8qmV5GmHOjBn/G8zE5VTgIJmTMEbUgRCD2kSMgLPsRlTz+H73gb5rUcMr4evkbEux3vEQSdT+/QacbX2tyLutToY0T8+Pj6Jp4OZ5U/UBlPXqF+qXqE5mocn5Pe8VASgdDLxk+WP8bzQGipG6imJg/Pt+RAch3bQOhLPA2E7kbvWXIeQVXMGYK6pQqEfr80ISc6dnGFf0bEL6N/526A3mY+/hyGJ8s3sekV+mn0Mw34tPQQnW+Jc2RuJv/+YfLv6aJVS8wjqI6eIahXyjlCP194rHMd+g6/zJGIkVNWX6vReCjhfUT8bfQzjao85Ov5lhRIjnu1pytiTn2d/B5QkDlDUJ8vsXsOyClqasDt6yVS+JzvdWwbXv81Iv63gmlZAj1E51tC78d0X7RDK+q9i4jPEfF+9Du95xFUyzA5qEuKzVRrrVTHQZGS53S78qzWc90j1+35em7s79sg+tB3fh+bTZOHFTR7ziOommFyUI+7yBMI1daAqy09rdJwmt94RcZDQ6F4qsf7fvqdhnvyJp7fn7vu17eTf/eYR1A9wRDU4ZihFYdoHL/s6+G3VGvcSLJ3UDnXe15znJ4a+8N3+TT5/7t4OjdxfL8ec+/2lEfQBMEQlJei8tM4Pmy6slMrxivgOc/lOQeXab2xP14W+5+xXUZ7+Nm4d3/ftSIggoqs1iYNQUmX3oB38fK+PG7w9g2NK43wepg/dJlW58eMz/nHiPjr5OdXe16f+1kPoQcSstMzBOVcsjnpwAalfRsajS02HHvnnFymtWBymt6fdr4r7f36asfnAokJhqCMcyq4u9hWsuPX+3w+4zOoiwZ33aabbNKf23haXr+0cMax9+upmz8LiCAjwRDM79weoWG41Jc4rkeo1Tky0Iq3IWC9RO2N/M/xfIXPfcPWTrkOzlk1tPa8gmaZMwTzOveGGyraL7HdqI/jabCS03hvGU5T6/yhhzg+XXOlv9a8gqZduqcJcLxLG0qnVIItLyMNrRru0VMa0tTXyJ8Oi0vRGzS4O+N3xmrLK2ieYXKQ39eYNxCKeL6ZH/RiWNp4ur9LTV6FhS9OVbpXbT36M3Y9+vnYuec2xepwpfMKuiIYgry+xOWBiQYVPPc+to3Xj4XT8hJB0fFKNPJ3BUC7pFw2OwUBESSyMmUIsrmJy5e+PqfS/XbhZ0Jrfoxt47DWvVmGe/nP2L8sM/MNAzun9XPptfVwwe/uYsgcJLDycAGySHFjnVvJvUnw2T35R+kEMKvp3iy1NRY/jF6rgHfL3cgf5/tD7B4lcxdP51WnSE+O77SOzVBsq4fCmQyTg/RKBkJsjM/BvyuWCmqwby5IDQyh2++l/XwuMb4OvsXu/H+I9IFQTu8iX35B91Y11g7QsNKBkFsa9luP/q7pYaBV6J57FZtgJeViMNNV4vYde3xtpDofuTfoHXpEXT9wopWmEyRTOhBiSz7ykquocyjd0Ai/izrnPc0t5ZDfY5fLHkt5XVw6f/RYAiI4kTlDkIZAqE63pRNAE2oLjIYhWvdRVw9WCSka96UDobkJiOAESy9kIYVaAiFPNp6z+SynqmmO0XWYVxRx2bmoIRAqtWQ4cARzhuB8qYayLL2hk9PPpRNA02rqMRo+f6nV9jm9Hfs2UN2n1mXZTzHOJz1EcARzhuA8N3F5pfk5NvujAPWrJTBaclB0SuP+1PzJdU5zL5wwdfX4mcN8KwERHGCYHJxuHWkmw6YMhJbYMDpEA4BcahhKNwyf2zcv7m7GtMzpUJ4fOi+7Nj7NWVbMtXDC2HThCfUDvMACCnCaVDeMhnpe8pe5lO4xGhq+N/G04T0swvA1NvvQ9GRfb8cx5XOOZbNboIcI9jBnCI6X4nbpYUx6jca7yKvwmcOuxmXJwGjcGzBOR2+B0GCa/7UMixurrYm1js0iEqtDb4QlMWcIjlNzILTku3hYHUogxNwOXWslA6OlzCsaAqIaA6FaXcfxq+rBIpgzBIelWjpb5ZPWNLhccgOHupWaYzTMK/o48+fOacjTb0e81zLlG6+i/0AZjmbOELyslj2E9ul1kvQxljr2n7aV6DH6sOfze/E5It4feM/cZUQLZbN5RBDmDMFLag+EIvQ2RajMaVeJwGj4nK8R8Xamz8yttkAoop2yWUDE4pkzBLu1EAgtnfxdnl3LIvdi7sBoWFih91aAcuIwARGLZs4QPPUl2gmEem/EvOS+dAIoYikNtvEco9zX+lU8nW/TU7lS6nppMQ9bTDMkYZgcbKUaNrKUBlsp8pclGU92v43nG2qm8G70GT3cXz18hxL0ELFIFlCAjdYCoaX2jKioWbLXsa20byLtnJ9zlqiulUb9+daxWfzh9aE3Qi/MGYJ0DYA5K98lDnHVuGGpxpsKD97E07Lrz4j4+cLP6Skg2pVnHGcV8o8FcaGzdOOK/5LJ2RrqeclflmxcV+/rFf4Q7cx3nEPJ7zGuS1rtxe8pMIYXmTPEkk0DoXMfDsxd6S7ptjVcA546tGRziiFivTSESw2Xu45t/rWyxPY+hhzSPXOGWKr15HUrgdCSyFs43k1sF1cQEG2Vasz3kn8RAiI6Z84QSzS96s8t5EtUDku5Y1W8cJocq8z1QkB0OQER3TJniKVJUTF9DpVCTvIWLmf+0FOlghJ5CJUzZ4glSXG5p1ix6VxLuF17ajhAaYbLPaWH6HJ6iOjOqnQCYCaektZP/kJ647lE59KYv5w8hEqtYt3LvQk7tbaZ6hI9RPsrLkGtXkfEt7i8HNSYZ2wdm/r1h9IJgUuZM0TPvkQ/gVAvjZCpzyEQgtxSLa4wLgtvEh2zlBJlag11SUrvov3rAMwZoltfYlNQX6q3yqsm3yLix9KJgIVI1RsyHKeH1etK9BD11MMWsel51NNG0/QM0aN19BUI3ZZOQAIPk39fRZpzBBwvRSO8t3ZD6R6izwU+P4eeAjwWxpwhepPqgq4lEIroY6GTcQOqprylHX+UTkAnrDD3XMmejfeFPjcHPUQ0yTA5etJjIDT2EO0/la01b6mfIZXpCIiem7sh31v+DQRENKf1hhUMeg+EIupO2zFaTz9luX7q09s5mTs46S3/BuuI+Fg6EXAswRA96DkQ+jp6XWP6jtVy2qmDayitVOXmXaLjlDSe0yggSuPHeFp/QbXMGaJ1PQdCEWmWBi+t1ryFpUsxpOl1bJZXfn15cop5FRH3sV3mf+6hXj0Mgd7lbfT73eiIOUO0LMXlexdtV+I1EwRB/VI0/N9E+/NfpvudzRkQXUf7+bfPMDdKfUC1ROu0KkXFsQ6BUCr3k3+r+KAdKcrTXu758ZC5Obc16CX/9uk12KMDgiFalKJQvY/6r/9pgFGrdTx9qtp7pc78NKTa0MO9P64XVjHvPkA95N9L3MdUaeXSpCEPkaayaKXCqT1YG1zteQ0pjGsp8w/ySTWUqbclo3+IeYd59ZZ/U4bMUZ3Vuut7jo70vlBCD+QtqU3ve4FQXjkCot8i4pcExyxNIz4deUlVVCy0QCBUP3lLSjfR99PxmqVecvuXRMerwVzX5BLK03W4x6mEYIjaLTUQejj8lip4wkdqFjYpL0W52+s5FBBdbr3nNRRhzhA1W2ogFNFGmltII21RI9UjxYOOXue/3MVmcYXces2/6XXloRpFmTNErVJNmlbA5iFfSU1l1KceG/TX8XST1px6zL9ByY1u4TvD5KhRqknTrRasH0sn4IBW85V69drYa92Se+cPeRXzbX8wzr9Wtlw4xq6NbmF2giFqo/KN+LF0Al7Qcr5SJw2guuUok3s553O2oYYg6Dr6Coimerk2aMhq7bKjHgKhuslXUmph42M2Ug9huop+9oyaa3jXKrZ15BzD80oyZI5Z9VAQ0b7PIRAazLnb+Slaz1fqsg71T2tSlNHjcqSn82+FufQsvc1sVq41Ckt5AfZQUfxQOgETtxHxpnQi6IpKp11WmNtvrt6MXvNvH71EZNfTkxnaIxCq28cQCJHWkhpxPbk7/JaT9Fpe6yHKQ7lBVuYMUcr4yrt0idKlVQxzkKekprZp13hPnVRP6nvq4RjPf5qrJ+M2+t3Ydhc9RGSjZ4gSphXgKYHQ9Hd7KhxvSifgUU95Sh16afSyYY7nU9O21BzX+xJ77ZUjZGHOEHO79IK72vO6BzU85estTylPJdMnPUQvm6Mno9e8e4keIpLTM8SczBGqmzwlpY+xvIba0qQ6v+M5SQ+JjlmDOa7/JZbbyhWSMmeIuaS60u7j6fh10lhihUo+apblSPGk/nVsr5keHtKO80QPUR7riPgUET+VTgjt66HQoX6pCumP0W8gVKoiuw2BEGktrVFGGj2VQ9Pvoocojx9DeUMCgiFyS1VQ/T0iPiQ6FhtfYpmTcMlHw2SZLKhw2Bz3xv0Mn1Ej5Q4XsYACOakg6yVPSU1lsmwWVDgs95C5VfSbd4dYWIGzmTNEDh9j032dwhIKt68zf94S8pR5qUmIyBMQ3UX7w6PH3yF3o73nYPIQARFnMUyO1L6FQOhUbzMeu+d9majDUhte7JZ6hbnWA6GI598h9z2z5HJeecTJBEOkdBPnz0GZjnVecmGeykP0vS8T5Wl4kEsN+67lJCDKZx2bxYHgKKu1uow0xhfSQ5weaF+PXi+pEL/JeOzxOVhSnjKP4Z4/536nb+YPHceQuXyG+VPqPg5aLfY2IaXxVfQtLhv2tbSCa46nn0vLU/K6je2wn9vo/wk+5xEQ7Td+gKDBnpf85SBP87jUtJISCNVFnpLSTTyd/yAQ4iVWFN1t2vbKGez1lnfn6C2YJjHB0DKtH/88RMQfFx7nXOYI5fU15ClpPYTgh9NpiB5HQJSX65C9Vq6ORdm1stiHyf8fU2h+iYh3F6RjOpRuqQV1rttvqflJPqoKSpsOl+txrlrOIV09Djc8xjhPh++vjuSJVdhoaCmOPdGHlmK+9IL5EhE/PL6+jz6WTS1pWnkq5ElNJcGlcswf6i0QGgiI0tqVl+YR8USvhQlPXVL4rSd/LnEb20DoSwiEUhAIkdPSGk7kk2v+0N3Od7XNkLn8lG18JxjqX003/DDf4HNEvC+ZkAp8THw8FRyp1VR20IccAVGvD9Vy7pPj3t6QD0SEOUO9q/H0arRv/JjoOHdhUjvp1Vh20AdLbh9nFfmWrn8VfefdKQyZw5yhjtV4YhU4aclPcqix7KAvd5GmR2cJAdF9PN2UPJXe8+4UAqKFM0yuPx+jzgJOQZOW/CS1T1Fn2UF/rsMeRMd6FemHVQ96z7tTrGOz0i0LJBjqy12kG36VkgL3qa8X/r78JLVPYR4f81tHxO8JjtN7mfhj5JtDdBXPg4DpPoBL8Sb6XJCDA8wZ6kctp3Lapd97JXWOt4ffspf8JLVayg6W6edIs/9L78O+VrF5aJHjgee+fQN7zs99hl7Lc67FP2Kz/9UvKRNEfuYM9aGWk/gQAqGc5Cep1VJ2QMR2C4dzR630HhDN3Xvbe36+5KWA6GO8HJSuI+LP2AT6NMAwufat97ye27QC03BPS36S2lIbOdRtaIB/OfP3ex/iNfd9exXLrX/Gef1nbIP1Y3rnPoQythmGybVtevpKFlg2/zzOObec/CQ1RT+1exeb6/SfEfHrCb+3in6v76G3osTqZ9NeoodYxgP1S68lK9U1YAkXcq9qLezd9OkoRMmh1rIDdvlrbIcdHavXcvMqNkFIRJn7eJyv2o/HU+ZWbuUUNedrXDYBP6deK6BUTrnb5CU5KPFp1U+xuX5v4rg6sNf5Lq9is/rb2zgtP1LpNV9z83CzYivXdFM+RZ2B0F3k2SW7JwIhSlPY04M3cXzDsteG+7gd8CY2E/p/mvHze83X3ARElTJnqB1fYv/yl3OajhN2Yx/20m02LRzlJzko6unNcE1PVzGdWkLD/cfY9hbNZdif6M3jv5cyh+hSAqIKuXDbsI46AqEIgdCpDlXCAiFy670hyLK9iu0qX/ssoWx9c/gtyb2NzTC9CO3JUyiTK2POUP1qPUNLqFwudey5M8yQXGotPyCHlzZvXUIPUYleh6E3qve8TW0dEZ8jzya6nMicobrVeHIODUlg49hzN/fkV5ajxvID5rBvCN2XiPhh/uTMqtQwrCUEm6m9j82iWLWM/Fksc4bqVeOp0Rt0nGPP3W0IhMijxvID5jYMoRvqrvfxdJ5LrwRE7RhWBdS+KsgYzzpNNzYrbck7UJ9qfO5u9r5r8zSo9wqZ+d2ExghMrUd/3sYy6rNS5cAS8jYH5XZB5gzVZXw27mKzk3apgFWBdrrx+buN/cGOvCUHpTkcNjyFN2QuHz1E59FDVIieoXpMC45VgTR8DL1A55qev2FBhGnPnrwlBw0PON46+g+EBrX0ENUwyqUFyvICVmv5XoOSJ8FKZpcbn7/pZEhLkZObQhx4SQ09RB6+H08P0cxcnOWVfGpzFQKhS43P3+fYvSrMfSjYyEMgBByjZFtDOXU6eTYjc4bKmjv3NcjTms4Rer/jPfKcXJTewClK9Ti8is3iLh6+nkYP0UwsrV3OOOu/RZ4llu0JlM/4/P0ZER/i+XlUiJHLevLatQYco1R58SaWsax5ai9tJEwiNl0tY5rpKQOhb2EDr9zuRq9/j4i/xGaI3LhnSMFFLtPyo7Zr7Ws8nZyukoG6lAqIhraOMuF0D2FqSzYlVixbulyFQG0Nop4NvW2/RcQvj68FQsxhugdZLZXjS73Qw/2gAQT1KNmjbB7R6YY8077IwJyheaXM7c8R8WPC43HYfWwbnzexDYTGFFTkMh0aV0Mg9CV2z5XbRVAEdREQteE2tvOtBEQZmDM0j1Ozed/F/ikifro8OZzhIZ6ek13jnhVQ5FLb0LhLPl9QBPVYR7nh9QKi40wXnhAQJVbDk8XenXqjTxvdd7FdBlsgVMa04Pljx3sUTORSS2PhavQn5fHuEx0POM/bKLcpqjLgPLXUC12wgEJe52SuTTrr9/PotXNETqUL6PvIP7d0OL6ld6Gcq3g6HGtOQxlQurxrzTpOG6rMHuYM5XNJzk5XY6KcfefRsuXkVrJ0LrX0boSgCEpZRdmFWQybO522YgLmDOVxSbbqaajHrvN4Fxpq5FeiaK5lTuIQFH0OFT3M7So2D2RLbdExDYjuw4PHQ9ax2e/w50NvZDdzhtITCPVh13n8FAIh8pszEBrmw9U4J/F9pJ2jBBznbWzqu1LG97xA6DgfYhPEcgZzhtI6NzNtlFqX6Xn8e0T8rURCWJQ5d2dvLcCwAh3Mq/Q8FEPmTvc2ys37apo5Q+mcm5OtNUp6V9sSxizDeBXJXGP2a9mb6BJDHn2N7W72QB6ll3AWEJ1uFYYWnsycoTQEQn0QCFHC9LpLHbD0eB0PPelz9qbBEtUQEN1G/lUte/Iqyp+3prT+lLC0LyEQ6sX4PJqnwFxyPY/6eyzjOn4bm+/4pXRCoGOln5sb9nWe0uetGSLt8wmC+jGcS+eGOaWuqObYE6hW4/kNGgCQXumehqvYrOZq+NdpSp+3JqzWa/XGGQRCfXFemFvKgvePiPhLwuO1zmILkEfphrXNWc9T+rxVzzC5051zE34LFyKwkaIi/xzbYXACod2WMEwQ5lZDIOK+Pl0N561aSx1Sca5zLiY3LTC4dDNB5cnphjwzxAbSqKGnwUpzp6vhvFVJz9DxBELAJcZlyCkN87vQy5HCKjZ5WHIzSehFDYGIMvF468nfjJgzdJxTM8kmqsDYuAz5GseVDyr6PH4avVYBwvlq6Gm4ioh/RsQvhdNRu6EnbdyjVvrcVUPP0Ms+xemV5VUIhICtXftX3b3wfr1A85HXcJl1lH+o8NfYDDvmZdOyrvR5q4Y5Q/t9idOCmr9HxN8ypQVo01DZPMSmx/iH2OyNM33PP0L5UZIV6OAypXuJzm3PfonNpq6DV7EZwvwqths6f4rNXkc9bvBc+rxVQTC0232c1mu2+AsJeGbcsH4Vm0BoStlRl+F8/BERH0omBBr0EO2NONpVLs/tIcrWBYsPiFamDD3zUo7sWv1p0RcQ8MyhhrQyo34/P/596ggBWLLxvBSONw4gf49t+TOnRZ+3lVEBT+zLjGFM7DgQWuxFA+y1b5W4f4uIf5k5LVxueGpcqoECrRg3phfdsL7QsG/cTWyG5s1psefNMLmtl6LC6STbRV4swIumgdA62hsywm7jjW09QYTndk3O11Y63zA/6VvMO1dpkedNRb1xbOV2Ewu8SICjTHuOla99Gh6OfSmdEKicFd4u9zbmX/VycQ98zBk6/qQLgoB9HkJP0NK8f/z7t3jacwRLNyyk8CoW2tOQyZyrXq4j4nNE/DjDZxW35DlDf8bTzfcGFkkATiUIWq5fRq93VagagyzNtDz8EnWs2taLuYKi97GQ8mupFfg6dgdCN/F8qEv3FwEASVxFxMcd/wdL9i42vUWkNVcbtftekyUOk9v3je/i6SQ1FRgApxqWVf9HRPy1ZEKgIpbdzmeOnqKuz93SeoZeulCGlfX+iI5POACz+DWMLoCpdWznWA5//iyaon4M5U2uoKjb7pMlzRk6Ziy3SguA1Oac+Ay1m7a1forD98ZdzL/vTquGjo4c5U2XPURL6RkaXxDjcasCIQDmcmhZbvMqYLdVPO1NGv+5jc2oHp5K2VP0bfS6u4c6S5gztJ68ngaAN7FZxx0A5vB+9HpcRy3lASW8ZFia+1ir2MzV29Wi/fz48yW384a8/D0ifj7zGG/j6Xnpqoeo94J3emNMT9xVLPsGAaAs84rgqZRt0/exWRxrHU97N5boL7Epa/5+5u9Pz8s6NsMXm7c6/JZmjQOh/xQR/8fkZ70HggC045J5RcNwoYg8dduxT4FrfVo83RR5msb7x/dcxfP8exURX2Oz7cb15P/Hx4/YnofrHZ9xbDp3NTi/Pv7/1Sid8fj369HnDu+Znoe70c/2rep2N/n9U66j8fDOXdfhOjZ5PM7f8ecM25qMr/2ryZ9dn/fSd97lzYGfL8XfRq8vHR82nLca7/uj9bqAwvhL/ceI+D9H/276hAHQtaGO2rcx+L7fyVm3HXvsWuvXQw37aaAz9e7C4x9r13Gu4vCGpbtGvYxNH3zvOk+rAz9/yaHvvyvIHH/OqUHKS8fiNC89hLmN4xetaDog6nHO0Pgb/WtsAyFzgwBoxbBf0R+j1wA5DIHMfWyDzVNX72s2IOppmNyXePr0Zh0R//L4+lMc/4QNAGpx7oRngFMNPaTj4ZiDY4KdJgOinoKhaTf21eRvAADgZbv2Khra03fxcvwwzBFrJsboYc7QS+OqBUIAAHC6XXOKxkHOvmXQr2MTEL00F68arc8ZuondYxoFQQAAcLmhXf0tni54sSsQunl8z6toZNhcy8tLr0MgBAAAc3gbm3b2ny+850083dOp+m6XVoOhXRlr4zoAAMjr59i0uT/u+fl09eZ1RHzOmqILrKoP154yLA4AAMobL/u/K6QYD5P7ISodNreKdiYN3cXuiVjVZSoAACzIrsUWhv/7I7bbBFQXELUyTO5/xPNA6D4qy0wAAFiwYdrK/ej/fo6nw+TWUdFcohaCof8eEf9h8n9X0dD65QAAsCCr2LTXvzz++/2O91QRENU+Z+hLPN1M9WM8HZ8IAADUaQiC9k13WUfEv0bEv58tRRM1zxkaJ+yPiPhLqYQAAABnG0Z07QqK/iUKziWqdZjcOBD6v0IgBAAArRuGz+0KfIr00NQYDI0z4p8R8b+XSggAAJDFrqBoHZveo9nUNmdo13J8AABAn65is2Da//z47+uYcdjcqo51HARBAACwUP/L6PV68nfW2GBVwap2AiEAACBiGw98jYi3EfGPiPg114eVnjM0jvgEQgAAQMRme53sMULpOUMCIAAAYJ+/5jx4LXOGAAAAZlXDnCEAAIDZlR4mBwAAUETpBRQAAACKMGcIAABYJD1DAADAIq3WuoYAAIAF0jMEAAAskjlDAADAIukZAgAAFsmcIQAAYJH0DAEAAItkzhAAALBIeoYAAIBFMmcIAABYJD1DAADAIpkzBAAALNJKLAQAACyRYXIAAMAircI4OQAAYIHMGQIAABbJnCEAAGCRVqUTAAAAhd09/n31+Pf68fXD4+vV4+vh/24i4seZ00gG5gwBALBEnyLi/YH3jBcbux793yqeNqKvgiaZMwQAwNKkbgEPPUk0xpwhAACW5HOm4wqIGmTOEDX7FhFvSieicfcRcRsRP5ROCFCNHM9B70ObgnaoE/nOpqvU5H/EppIe/giELncdEe9im6e5noYBbfgz03EfMh0XUss9KMqgq8asYu2cUdzvEfFz6UQsxA+xLah15cPyfIg8jbW7w2+Brhki1yhzhijNJTifaUEtKAJSuS2dACjsJiLelk4EpzNMjlKGYVvMZ1/Qs46Ir3MmBOjOfekEQGECoUYJhihhGgQJisp7G8b8A+e7PvwWgPqs1uYMMa/xBXcXm9WHDNOqw7CrtockAPTqKjyEZUSjhzmNC5+HsAxrja7CcBfgdNoTsOEBb2MUXsxl+hTGtVevV+GpGXAa+7bQklwBi0CoQRqkzOFL6QQAAIwMQ8NTHUsg1KiVKUPM4F3pBHCS24h4HfZMAI5neC0tmi788TE2vZzHdBZ8C+2bLqyMhiEzK5S15/Xo9Zcw/AU4zKar9OCn0glgfobJkZuehTYNGyh66gUcw9LaQJMEQ+T0sXQCONu4d+j3YqkAUvtHpuN68AU0yZwhcvqxdAK4yLAP1M+lEwIk82vkGR+vNQE0yZwhAFiO3zIdV88Q0KRViIbYUJG16TY2PTg5FjkYb4qbeiGFXOXOl4h4n+nYOeTKh9T3s3riPLmvx5rOy5uoKz2nuo3Nd6jBbxHxl9KJyKSmtkaO6zXl92v5fmrK6vBb4CylbuI/ot9K5HM8D0hex9P5Pbm0spBCS4EQ/fshtmVhTY1AnisdCO0q33s0bhu4J6jCeM7QfVgNZmluonwFkMJSCtRpQ/+36Dfwg97kDIoe4uUFkewZttsfUcecyKX2AAzf+yG0P5nf53hsV40LTxfi8rQeCN3Esiv4X8Ku19CadaTfk+fQyrDKiN0+FP78dSw3EBp7FfKB+X0f8WIBBVrV2tyQ3PTsQt3GvTPXobemBvdRbrqAxtdz7gnmdB+PD5JW7sZFOzS0omYCoadyLYbS8jUCNRkaees9r1mOcVntQdZT7gnm8v0+XHk2QSPGBaSCcrerSB8QyWtIa3pP3cY8i6DwXInybVpGC4Q2xveBgIg5vHr2gkVqKRRWMJbR0jUCLbLFxXL8OXp9UywVdXod7gPm9b1dac7QsrX4ROqhdAIql3pYmwcmQK/mLt9+Gr1ufQGjHMYPPfUOkdv3NrA5Q7SmxQBuTsPEbKAtvWx10BKNbcCcIQCogHlDfdPaOp3eIWZhCAwAALUwHJ5ZCYYAoA56D0DblJmt1speAIBc/lvpBDTMUDmyM2cIAFiiufZ4+nGGz/g9NsPLft3xs8+xCSiuYtPrcj96HY//HlqDw/vi8efX8Xzhoq8R8TZVwqG0VekEAAAUMA6EcgZGf8l03MGhnpP3iT/v3eTfHqvTtPG4TBczALTD8KF0Wl3Nr4ZroIY0wKm+xz3jOUMpL+bfI+KXhMc71r9FxN8yHLfEjf5nPN2gDaAnrTSgPsY8w5zOdU4+5nj42cr5LGEJeXMVHqq3ooXr8WNsejRzpvX7fLTxnKGUk9R+SXScU/1P0c/N+GH0upfvBNCa8UMpZTHsJyAilTnK3VfPXiT2KdNxl6qFKB6gd3OUxV9n+AyAVmQvd1ejcCvlh2m8p+eJC0B5uctie6wAqT1E22VL1nJ3lenY02UYSUNABADU6j60AWvUciA0SN0G3jlnKKWHLEcFgPI8mKKUj7FpY72NzXX4JjbLgl/F/iDkLp5er7vmiK9j22Ae9yJcx/Z6Xz/+bPpZt49/vw7tv1rZvPa57/mRa5+hHiJQ4KnPkX6/CuAp9edynRNgH/M7Kdp6401bp8bLkrt+6/QQeuz2WmV6tHV7+C2c6Ws83/AM5iAQgvwsoLAceheZi0Doubt4fFCQK4J3g+fzQ+kEANWzomd+N5mOa3+5/g1DzoDTfMtx0FWss9yPbnKAcmreJLQXbyNPXfdnPN1njn7cRr7pCbAE7yJduft9zlCuniGTtADK+Vg6AZzNnIs+rUMgBFXKNWdIMARQjqFW7VJ/9sdoGaiYniEAgDzGgdBdsVQAe+WaMwQAsGTjBtZtPF2CGijr+/2Zq2fIEn4AcDpzhvowXdFRIASVyjVn6D7PYYGCbLoK+dmnrw/KSqib1eSAk6nc2/GldAJgwT6XTgBwvFWmNU4EQwDl2JwZynH/Qf2+dwit1lZ8BIBaeJjIse4e/9QUfGlU0orsw+SA/hh61Q7nql25g6HfMh9/6XIHA1ejP6+jrkAImpQrGBJkQX9auK/t47GhgdQuPUPs49qADHLNGdJNSi7rUCGU8rZ0Ao5gWX9al7v+/CXTZ3yLNsqIuaSuq/T2Qia55gy18AQZeuRBBBEapi1rtf58UzoBnbOaJ6T1/YFFrkLXEwxy0uDf7VvpBFANgVC79G72wQgGqNv3tqR9hqAfnsxuCJZpWas9QwAt+d5WMGeIVq0j4muYKD5wzz1lmBitavle/jMiPpROBMARxvsMZaFniDm8Cwsq3EbEqnQiKvQmXBswt59i85DqXemEdEh5Bml9v59WbT+Egoh4ehH3WFl8iogfYzMX700YRnOK4dr4FJuGGpDX29jcd7cRcRNt3HetBBqtpBNa8P1+yvVE2QRQSuk1un/pe80xJOxT4uNdxbzn6seZPw/O1cvDjtePf1q571oJNNaPf2q5Tv4ZEX+NzRDJ14XTAmcxZ4hc5m7sLtkcc2NaeLoLcK6b0gk4QW31a01pgZPlmjNUyxMLAGhJC70TPWopGAIuNx4mJ6AHXvS1dAJgQQRDZaTq/a6t1wbY7XtZa58hcnId9CHX8uWuD6BnepugAat1nucXGjkMWpmUytZ9bBdBSb1wAlCe5a/nYSNsqFf2nqGHTMelPeaPtWe8GmTuhRMMJ4H52aw6r/EDwPtiqQCOoqHKHPQMtWPuPZuUQVCGBxHzsNUIVC7XAgoaOEz9ERE/l04EL7qL7d5jcwawhlLC/F6FgCgnCylAI3LNGVIAMPWXcF3U7CG2gdDck341yoAeCYigAbl6cFaH38ICXYX5ZLUayoJPMc8mrlN6hmB+7rv85DFULlcw9C3TcWnfdagcanUV+RdMOPT5Y7dFUsFcrFS429wT7qf33VLr75w94tM89lAQyvt+z+eaM1SyQUUb9g0fGC/rzHxqCVDH18XriPjy+Lfe5v78WDoBlSoxrGp83w09w+M5hFxunMfmVUN53+/D8Zyhh0h3g/4jIn5NdKxzXdKoTpkXOf0ZmwbFVZzXmP0cEe+Tpug0V49pGC/zOj5nd7E5Dy2ci1bVEgSNjRsN0yWA72Nzf17FPA21Q4s7XPrzY99Ti0vLxtJlTm12nftSSzEP6RjuvTnur0P19L57Y/j/Ia3n3j83sd0LaI56prU5RJeWTUNZfc4xxucmt0vLtfHv52j/ptgX7GP011Fx6IHNoev3U2zmsz85SMqCoIaK/ZLehVYa3x8u/P0aGiXjNEwrCU8l8/kSdZz/faYNs8F1zNtzeKgsu/Tnx76nFpeWjTVfcyXsOvely705G+yH7uV998bVgZ8fa9zYnus+3Fe21ejSPLmkvJhzw9pLy7Xx77++8Fi7pNggubdAKOJwWXno+v3L8CJXo7/EBGwuU0PBPDxB+lg6IZ26iW0et9IoHdL7/5ZOSGNamG/VQhpLqGGY8FWc/0S/VXPn+ziPzSHqR49BR/dWsWkE/1tE/PsX3vf32NywQ2ExPDka/m8dmwvgv0TEX6OeSdj/FtvI8S626R8XPEP6b0Y/X8em+/7XyBPlX+oqIn6LTTpfxSa6/f/i6ZCy9eT18HuvYvv9X8XmO7+KNE8eUjnU4/X32HynVWwrk/t4XnlPK/JhCedx4Dec/9vY5tdwrPHDgnF+Dl3/wzEfYjPpeMjL4d4Y3nMd+6+/4Ri38fT6ezU5xvj6HL7bkPar0fvvo8/C+D+88LNhqM3vo/8bn/vreHp+xu8Z8m/I32m3+nCt/BIR/4ynw3NejV4P1+OryXuGY32LbVk0vpaG9H2NzZPQ4WcPk2MM18/0+h2O/3NsyoRV5Dv/n+Pp9x3Scx/beybiabqHvcU+xtPv8jaeD4Fs1V1sH+CMv/v4/h3O63Vs8mp8DVzFZrjz77Gpb2p7ULEvIPoc2+/xQ2zqoIjnZdJwjNex+/od179DYDDOu4fYDkMa31/jY4zL7yENw/UZsS07V7G9Vq9H73v9wvecw65A7B+xSdeb2AznmZYZY+P6ZVq+DD8f13/TIYb38bx+fDV53/j4Q74NQzpvY9ueHJePMfr5+Hofjj8cezje8Ho4/6vIX07894j4X2N7/Y7TP6TlYfTv6VYQ64j4dxHxn2NTT6TcT/EutvfZuOyd1jF/jc31Mj3HQ/p+jU17+Coi/pYwfaVM79X/J56234aydjhvf4tN/T2tv4br8tf/H0SLXgE8RI09AAAAAElFTkSuQmCC" alt="m0untain"/>
+    <span class="livedot"></span>
+  </div>
+  <div class="nav-tabs" role="tablist" aria-label="m0untain sections">
+    <button class="nav-tab active" data-view-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
+    <button class="nav-tab" data-view-tab="connections" role="tab" aria-selected="false">Connections</button>
+  </div>
+  <div class="top-stats">
+    <div class="tstat"><b id="t-eps" style="color:var(--inbound)">0</b><span>events / s</span></div>
+    <div class="tstat"><b id="t-blk" style="color:var(--block)">0</b><span>blocked / s</span></div>
+    <div class="tstat"><b id="t-ips">0</b><span>live sources</span></div>
+    <div class="status"><span class="status-dot" id="statusdot"></span><span id="statustxt">armed · live</span></div>
+    <button class="iconbtn" id="settings-btn" title="Ayarlar" aria-label="Ayarlar" data-testid="settings-button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63 1.7 1.7 0 0 0 10 3.08V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9 1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+      <span class="notice-badge" id="notice-badge">0</span>
+    </button>
+  </div>
+</div>
+
+<div class="view active" id="dashboard-view">
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="view" id="connections-view">
+  <div class="conn-page">
+    <div class="conn-metrics">
+      <div class="conn-card live-card"><div><small>Live flow pulse</small><b id="conn-live-count">0</b><i>events / s</i></div><div class="conn-spark"><canvas id="conn-live-canvas"></canvas></div></div>
+      <div class="conn-card"><small>Observed connections</small><b id="conn-total">0</b><i>session</i></div>
+      <div class="conn-card"><small>Outbound apps</small><b id="conn-apps">0</b><i>unique</i></div>
+      <div class="conn-card"><small>Remote endpoints</small><b id="conn-remotes">0</b><i>hosts</i></div>
+      <div class="conn-card"><small>Blocked decisions</small><b id="conn-blocked">0</b><i>WFP / engine</i></div>
+    </div>
+    <div class="conn-main">
+      <div class="panel" data-static-panel="connections">
+        <div class="p-head"><div class="p-title"><span class="ey">live flow log</span>All Connections</div></div>
+        <div class="conn-list" id="connection-list"></div>
+      </div>
+      <div class="conn-side">
+        <div class="panel" data-static-panel="apps">
+          <div class="p-head"><div class="p-title"><span class="ey">application control</span>Selected Process</div></div>
+          <div class="app-detail" id="app-detail"></div>
+        </div>
+        <div class="panel" data-static-panel="remotes">
+          <div class="p-head"><div class="p-title"><span class="ey">remote targets</span>Hot Endpoints</div></div>
+          <div class="mini-list" id="remote-targets"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="focus-scrim" id="focus-scrim"></div>
+
+<div class="overlay" id="program-overlay" role="dialog" aria-modal="true" aria-labelledby="program-title">
+  <div class="dialog">
+    <div class="dialog-head"><div><span class="ey">Yeni internet bağlantısı</span><h2 id="program-title">Uygulama kararınızı bekliyor</h2></div></div>
+    <div class="app-card"><div class="app-icon" id="prompt-icon">?</div><div><div class="app-title" id="prompt-name"></div><div class="app-path" id="prompt-path"></div></div></div>
+    <div class="connection-grid"><div class="conn-cell"><small>Yön</small><b id="prompt-direction"></b></div><div class="conn-cell"><small>Protokol</small><b id="prompt-protocol"></b></div><div class="conn-cell"><small>Hedef</small><b id="prompt-target"></b></div></div>
+    <div class="warning-note" id="first-packet-note">İlk bağlantı olayı WFP tarafından sınıflandırıldıktan sonra görüldü; ilk paket geçmiş olabilir. Sonraki bağlantılar karar verilene kadar karantinada.</div>
+    <div class="field"><label for="prompt-scope">Kararın uygulanacağı bağlantı tipi</label><select id="prompt-scope" data-testid="connection-scope"><option value="all">TCP + UDP (tümü)</option><option value="tcp">Yalnız TCP</option><option value="udp">Yalnız UDP</option></select></div>
+    <label class="remember"><input type="checkbox" id="prompt-remember" checked> Bu kararı hatırla</label>
+    <div class="actions"><button class="btn block" id="quarantine-btn" data-testid="quarantine-button">Karantinada tut</button><button class="btn allow" id="allow-btn" data-testid="allow-button">Bağlantıya izin ver</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="settings-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="dialog wide">
+    <div class="dialog-head"><div><span class="ey">m0untain</span><h2 id="settings-title">Ayarlar</h2></div><button class="closebtn" id="settings-close" aria-label="Kapat">×</button></div>
+    <div class="setting-row"><div><b>Windows başlangıcında çalıştır</b><small>Kullanıcı oturum açınca arka planda, tray ikonuyla başlar.</small></div><input type="checkbox" id="setting-startup"></div>
+    <div class="setting-row"><div><b>Kapatınca tray’de açık kal</b><small>Pencerenin X düğmesi korumayı durdurmaz; dağ ikonundan tekrar açılır.</small></div><input type="checkbox" id="setting-tray"></div>
+    <div class="setting-row"><div><b>Yeni uygulamalarda bağlantı kararı sor</b><small>Bilinmeyen uygulama m0untain açık kaldığı sürece karantinaya alınır ve TCP/UDP kapsamı sorulur.</small></div><input type="checkbox" id="setting-ask"></div>
+    <div class="rules-title">Hatırlanan uygulama kararları</div><div id="program-rules"></div>
+    <div class="actions"><button class="btn" id="settings-cancel">Vazgeç</button><button class="btn allow" id="settings-save" data-testid="settings-save">Ayarları kaydet</button></div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Environment: real Tauri backend if present, otherwise a live simulator so the
+// design is fully previewable in a plain browser.
+// ---------------------------------------------------------------------------
+const hasTauriApi = !!window.__TAURI__;
+const params = new URLSearchParams(location.search);
+const soloPanel = params.get('panel');
+
+// ---- tiny canvas line-chart (oscilloscope style) --------------------------
+class Signal {
+  constructor(canvas, opts){
+    this.c = canvas; this.ctx = canvas.getContext('2d');
+    this.series = opts.series;            // [{key,color,fill?}]
+    this.cap = opts.cap || 120;
+    this.max = opts.max || 10;
+    this.grid = opts.grid !== false;
+    this.pct = opts.pct || false;
+    this.data = {}; this.series.forEach(s=>this.data[s.key]=[]);
+    this.times=[]; this.hover=null;
+    this.tip=document.createElement('div');this.tip.className='chart-tip';
+    this.c.parentElement.appendChild(this.tip);
+    this.c.addEventListener('mousemove',e=>this._hover(e));
+    this.c.addEventListener('mouseleave',()=>{this.hover=null;this.tip.classList.remove('show');});
+    this._resize(); addEventListener('resize',()=>this._resize());
+  }
+  _resize(){
+    const r = this.c.getBoundingClientRect();
+    const dpr = window.devicePixelRatio||1;
+    this.w=r.width; this.h=r.height;
+    this.c.width=r.width*dpr; this.c.height=r.height*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  push(sample){ // sample: {key:value,...}
+    let peak=this.max;
+    this.times.push(Date.now());if(this.times.length>this.cap)this.times.shift();
+    this.series.forEach(s=>{
+      const arr=this.data[s.key]; arr.push(sample[s.key]??0);
+      if(arr.length>this.cap) arr.shift();
+    });
+    if(!this.pct){
+      // autoscale to recent peak with headroom
+      let m=0; this.series.forEach(s=>this.data[s.key].forEach(v=>{if(v>m)m=v;}));
+      this.max = Math.max(this.max*0.94, m*1.25, 5);
+      peak=this.max;
+    } else { this.max=100; }
+  }
+  draw(){
+    const {ctx,w,h}=this; ctx.clearRect(0,0,w,h);
+    const padL=4,padR=4,padT=8,padB=6;
+    const gw=w-padL-padR, gh=h-padT-padB;
+    // grid
+    if(this.grid){
+      ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){const y=padT+gh*i/4;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();}
+      for(let i=0;i<=6;i++){const x=padL+gw*i/6;ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,h-padB);ctx.stroke();}
+    }
+    const N=this.cap;
+    this.series.forEach(s=>{
+      const arr=this.data[s.key]; if(!arr.length)return;
+      const X=i=>padL+gw*(i/(N-1));
+      const Y=v=>padT+gh*(1-Math.min(v/this.max,1));
+      const off=N-arr.length;
+      // area fill
+      if(s.fill){
+        ctx.beginPath();ctx.moveTo(X(off),Y(arr[0]));
+        arr.forEach((v,i)=>ctx.lineTo(X(off+i),Y(v)));
+        ctx.lineTo(X(off+arr.length-1),h-padB);ctx.lineTo(X(off),h-padB);ctx.closePath();
+        const g=ctx.createLinearGradient(0,padT,0,h);
+        g.addColorStop(0,s.color+'33');g.addColorStop(1,s.color+'00');
+        ctx.fillStyle=g;ctx.fill();
+      }
+      // line
+      ctx.beginPath();ctx.lineJoin='round';ctx.lineWidth=1.9;ctx.strokeStyle=s.color;
+      ctx.shadowColor=s.color;ctx.shadowBlur=8;
+      arr.forEach((v,i)=>{const x=X(off+i),y=Y(v); i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+      ctx.stroke();ctx.shadowBlur=0;
+      // leading dot
+      const lx=X(N-1),ly=Y(arr[arr.length-1]);
+      ctx.beginPath();ctx.arc(lx,ly,2.6,0,7);ctx.fillStyle=s.color;
+      ctx.shadowColor=s.color;ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+    });
+    if(this.hover){
+      const x=padL+gw*(this.hover.slot/(N-1));
+      ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,h-padB);ctx.strokeStyle='rgba(191,189,182,.35)';ctx.lineWidth=1;ctx.stroke();
+      this.series.forEach(s=>{const v=this.data[s.key][this.hover.index];if(v==null)return;const y=padT+gh*(1-Math.min(v/this.max,1));ctx.beginPath();ctx.arc(x,y,3.5,0,7);ctx.fillStyle=s.color;ctx.fill();});
+    }
+  }
+  _hover(e){
+    const r=this.c.getBoundingClientRect(),padL=4,padR=4,gw=r.width-padL-padR;
+    const first=this.data[this.series[0].key];if(!first.length)return;
+    const slot=Math.max(0,Math.min(this.cap-1,Math.round(((e.clientX-r.left-padL)/gw)*(this.cap-1))));
+    const offset=this.cap-first.length,index=slot-offset;if(index<0||index>=first.length){this.hover=null;this.tip.classList.remove('show');return;}
+    this.hover={slot,index};
+    const time=new Date(this.times[index]||Date.now()).toLocaleTimeString('tr-TR');
+    this.tip.innerHTML=`<b>${time}</b>`+this.series.map(s=>`<span><em><i style="background:${s.color}"></i>${s.key}</em><strong>${this.data[s.key][index]??0}${this.pct?'%':''}</strong></span>`).join('');
+    const x=e.clientX-r.left,y=e.clientY-r.top;this.tip.style.left=Math.min(x,r.width-155)+'px';this.tip.style.top=Math.max(24,Math.min(y,r.height-24))+'px';this.tip.classList.add('show');
+  }
+}
+
+// ---- panel registry -------------------------------------------------------
+const PANELS = {
+  signal:{ span:'col-3', title:'Traffic Signal', eyebrow:'events / second', kind:'metric',
+    legend:[['inbound','--inbound'],['outbound','--outbound']] },
+  threat:{ span:'col-3', title:'Threat Activity', eyebrow:'blocks / second', kind:'metric',
+    legend:[['flood','--block'],['scan','--scan']] },
+  unique:{ span:'col-3', title:'Unique Sources', eyebrow:'distinct IPs / second', kind:'metric',
+    legend:[['sources','--unique']] },
+  rate:{ span:'col-3', title:'Block Rate', eyebrow:'% of traffic dropped', kind:'metric',
+    legend:[['drop %','--block']] },
+  active:{ span:'col-3', title:'Active IP Blocks', eyebrow:'enforced now' },
+  quarantine:{ span:'col-5', title:'Karantinadaki Uygulamalar', eyebrow:'outbound app control' },
+  controls:{ span:'col-4', title:'Protection', eyebrow:'detection modules + thresholds' },
+};
+
+const state = {
+  toggles:{ ddos:true, scan:true },
+  thresholds:{ ddos:'40 conn / 1s', scan:'15 ports / 3s' },
+  blocks:[], talkers:[], charts:{},
+  config:{
+    ddos:{enabled:true,window_ms:1000,max_conns_per_window:40,block_ms:60000,global_max_conns_per_window:0},
+    scan:{enabled:true,window_ms:3000,distinct_ports_threshold:15,block_ms:300000},
+  },
+  appSettings:{launchOnStartup:false,closeToTray:true,askNewApps:true},
+  programRules:[], sessionProgramRules:[], appQuarantines:[], promptQueue:[], activePrompt:null,
+  connections:[], connectionSnapshot:[], connectionBlocked:0, connectionSeenTotal:0, connectionPulse:0,
+};
+const runtime={seenApps:new Map(),seenRemotes:new Map(),expandedApps:new Set(),selectedAppKey:null,focusRect:null,focusPlaceholder:null,focusSuppressUntil:0,closingFocus:false,focusCloseTimer:null,focusCooldownTimer:null};
+
+function iconDetach(){
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>`;
+}
+
+function panelShell(id){
+  const p=PANELS[id];
+  const legend=(p.legend||[]).map(([n,v])=>`<span class="lg"><i style="background:var(${v})"></i>${n}</span>`).join('');
+  const el=document.createElement('div');
+  el.className='panel '+(p.kind==='metric'?'metric ':'')+(soloPanel?'':p.span);
+  el.dataset.id=id;
+  el.innerHTML=`
+    <div class="p-head">
+      <div class="p-title"><span class="ey">${p.eyebrow}</span>${p.title}</div>
+      <div class="legend">${legend}</div>
+      ${soloPanel?'':`<button class="detach" title="Detach panel" data-detach="${id}">${iconDetach()}</button>`}
+    </div>
+    <button class="focus-close" data-close-focus title="Küçült">×</button>
+    <div class="body"></div>`;
+  return el;
+}
+
+function detach(id){
+  const url=location.pathname+'?panel='+id;
+  if(hasTauriApi && window.__TAURI__.webviewWindow){
+    const { WebviewWindow } = window.__TAURI__.webviewWindow;
+    new WebviewWindow('panel-'+id+'-'+Date.now(),{ url, title:'m0untain · '+PANELS[id].title, width:560, height:380 });
+  } else {
+    window.open(url,'sentinel_'+id,'width=560,height=380');
+  }
+}
+
+// ---- build panel bodies ---------------------------------------------------
+function buildSignal(body){
+  body.innerHTML=`<div class="chart-wrap"><canvas></canvas></div>`;
+  const c=body.querySelector('canvas');
+  state.charts.signal=new Signal(c,{cap:140,max:60,series:[
+    {key:'inbound',color:getVar('--inbound'),fill:true},
+    {key:'outbound',color:getVar('--outbound')},
+  ]});
+}
+function buildThreat(body){
+  body.innerHTML=`<div class="chart-wrap"><canvas></canvas></div>`;
+  state.charts.threat=new Signal(body.querySelector('canvas'),{cap:140,max:8,series:[
+    {key:'flood',color:getVar('--block'),fill:true},
+    {key:'scan',color:getVar('--scan'),fill:true},
+  ]});
+}
+function buildUnique(body){
+  body.innerHTML=`<div class="chart-wrap"><canvas></canvas></div>`;
+  state.charts.unique=new Signal(body.querySelector('canvas'),{cap:140,max:20,series:[
+    {key:'unique',color:getVar('--unique'),fill:true},
+  ]});
+}
+function buildRate(body){
+  body.innerHTML=`<div class="chart-wrap"><canvas></canvas></div>`;
+  state.charts.rate=new Signal(body.querySelector('canvas'),{cap:140,pct:true,series:[
+    {key:'drop',color:getVar('--block'),fill:true},
+  ]});
+}
+function buildActive(body){
+  body.innerHTML=`<div class="bignum" id="active-n">0</div>
+    <div class="sub" id="active-sub">no active enforcement</div>
+    <div class="blocklist" id="blocklist" style="margin-top:14px"></div>`;
+}
+function buildTalkers(body){ body.innerHTML=`<div id="talkers"></div>`; }
+function buildQuarantine(body){
+  body.innerHTML=`<div class="app-list" id="quarantine-list"></div>`;
+  paintQuarantine();
+}
+function buildControls(body){
+  body.innerHTML=`
+    <div class="ctl">
+      <div class="lab"><b>DDoS / flood shield</b><small>per-IP inbound rate limiting</small></div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="thr" id="thr-ddos">${state.thresholds.ddos}</span>
+        <div class="switch on" data-toggle="ddos"></div>
+      </div>
+    </div>
+    <div class="ctl">
+      <div class="lab"><b>Scan / recon shield</b><small>distinct-port fan-out detection</small></div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <span class="thr" id="thr-scan">${state.thresholds.scan}</span>
+        <div class="switch on" data-toggle="scan"></div>
+      </div>
+    </div>
+    <div class="ctl">
+      <div class="lab"><b>Enforcement</b><small>WFP session block filters</small></div>
+      <span class="thr" style="color:var(--inbound)">● active</span>
+    </div>
+    <div class="ctl">
+      <div class="lab"><b>Bilinmeyen uygulamalar</b><small>m0untain açık kaldığı sürece oturum karantinası</small></div>
+      <div class="switch on" data-setting-toggle="askNewApps"></div>
+    </div>
+    <div class="tunables">
+      <label class="mini-field"><span>Flood / IP</span><input id="cfg-ddos-max" type="number" min="1" step="1"></label>
+      <label class="mini-field"><span>Flood block sn</span><input id="cfg-ddos-block" type="number" min="5" step="5"></label>
+      <label class="mini-field"><span>Scan port eşiği</span><input id="cfg-scan-ports" type="number" min="2" step="1"></label>
+      <label class="mini-field"><span>Scan block sn</span><input id="cfg-scan-block" type="number" min="10" step="10"></label>
+    </div>
+    <div class="mini-actions"><button class="tinybtn allow" data-apply-config>Policy uygula</button></div>`;
+  refreshControlFields();
+  refreshSettingSwitches();
+}
+const BUILDERS={signal:buildSignal,threat:buildThreat,unique:buildUnique,rate:buildRate,active:buildActive,quarantine:buildQuarantine,talkers:buildTalkers,controls:buildControls};
+
+function getVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+// ---- render ---------------------------------------------------------------
+function render(){
+  const grid=document.getElementById('grid');
+  const list = soloPanel ? [soloPanel] : Object.keys(PANELS);
+  if(soloPanel){document.getElementById('topbar').style.display='none';grid.className='solo';}
+  list.forEach(id=>{
+    if(!PANELS[id])return;
+    const shell=panelShell(id);
+    grid.appendChild(shell);
+    BUILDERS[id](shell.querySelector('.body'));
+  });
+  grid.addEventListener('click',e=>{
+    const d=e.target.closest('[data-detach]'); if(d) detach(d.dataset.detach);
+    const t=e.target.closest('[data-toggle]'); if(t) toggle(t.dataset.toggle,t);
+    const s=e.target.closest('[data-setting-toggle]'); if(s) toggleSetting(s.dataset.settingToggle,s);
+    const apply=e.target.closest('[data-apply-config]'); if(apply) applyConfig().catch(console.error);
+    const q=e.target.closest('[data-q-action]'); if(q) handleQuarantineAction(q).catch(console.error);
+    const close=e.target.closest('[data-close-focus]'); if(close){closeFocusedPanel();return;}
+    const panel=e.target.closest('.panel');
+    if(panel&&!isInteractiveTarget(e.target)&&!panel.classList.contains('focused'))focusPanel(panel);
+  });
+}
+
+function switchView(name){
+  closeFocusedPanel();
+  document.querySelectorAll('[data-view-tab]').forEach(btn=>{
+    const on=btn.dataset.viewTab===name;
+    btn.classList.toggle('active',on);
+    btn.setAttribute('aria-selected',String(on));
+  });
+  document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id===`${name}-view`));
+  resizeCharts();
+}
+document.querySelectorAll('[data-view-tab]').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.viewTab)));
+
+function toggle(key,el){
+  state.toggles[key]=!state.toggles[key];
+  el.classList.toggle('on',state.toggles[key]);
+  if(state.config[key]) state.config[key].enabled=state.toggles[key];
+  if(hasTauriApi) window.__TAURI__.core.invoke('set_protection',{module:key,enabled:state.toggles[key]}).catch(()=>{});
+}
+
+function isInteractiveTarget(target){
+  return !!target.closest('button,input,select,label,.switch,.detach,.tinybtn,[data-q-action],[data-conn-action],[data-ip-action]');
+}
+function resizeCharts(){
+  Object.values(state.charts).forEach(chart=>chart._resize?.());
+}
+function clearFocusPlaceholder(){
+  runtime.focusPlaceholder?.remove();
+  runtime.focusPlaceholder=null;
+}
+function makeFocusPlaceholder(panel,rect){
+  clearFocusPlaceholder();
+  const ph=document.createElement('div');
+  ph.className=panel.className.replace(/\bpanel\b/,'focus-placeholder').replace(/\bfocused\b|\bclosing\b|\bfocus-cooldown\b/g,'').trim();
+  ph.style.height=rect.height+'px';
+  panel.parentNode.insertBefore(ph,panel);
+  runtime.focusPlaceholder=ph;
+}
+function clearFocusedPanelNow(panel){
+  panel.classList.remove('focused','closing');
+  panel.style.left='';panel.style.top='';panel.style.width='';panel.style.height='';
+  clearFocusPlaceholder();
+}
+function focusPanel(panel){
+  if(soloPanel||runtime.closingFocus||Date.now()<runtime.focusSuppressUntil)return;
+  const rect=panel.getBoundingClientRect();
+  const scrim=document.getElementById('focus-scrim');
+  if(runtime.focusCloseTimer){clearTimeout(runtime.focusCloseTimer);runtime.focusCloseTimer=null;}
+  if(runtime.focusCooldownTimer){clearTimeout(runtime.focusCooldownTimer);runtime.focusCooldownTimer=null;}
+  document.querySelectorAll('.panel.focused').forEach(p=>{
+    clearFocusedPanelNow(p);
+  });
+  runtime.focusRect={left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+  makeFocusPlaceholder(panel,rect);
+  panel.classList.remove('focus-cooldown');
+  panel.classList.add('focused');
+  panel.style.left=rect.left+'px';
+  panel.style.top=rect.top+'px';
+  panel.style.width=rect.width+'px';
+  panel.style.height=rect.height+'px';
+  scrim.classList.add('show');
+  panel.getBoundingClientRect();
+  requestAnimationFrame(()=>{
+    panel.style.left='3vw';
+    panel.style.top='7vh';
+    panel.style.width='94vw';
+    panel.style.height='86vh';
+    resizeCharts();
+    setTimeout(resizeCharts,300);
+  });
+}
+function closeFocusedPanel(){
+  const panel=document.querySelector('.panel.focused');
+  if(panel&&!runtime.closingFocus){
+    const rect=runtime.focusRect;
+    runtime.closingFocus=true;
+    runtime.focusSuppressUntil=Date.now()+520;
+    panel.classList.add('closing');
+    document.getElementById('focus-scrim').classList.remove('show');
+    if(rect){
+      requestAnimationFrame(()=>{
+        panel.style.left=rect.left+'px';
+        panel.style.top=rect.top+'px';
+        panel.style.width=rect.width+'px';
+        panel.style.height=rect.height+'px';
+      });
+    }
+    runtime.focusCloseTimer=setTimeout(()=>{
+      clearFocusedPanelNow(panel);
+      panel.classList.add('focus-cooldown');
+      runtime.focusRect=null;
+      runtime.closingFocus=false;
+      runtime.focusCloseTimer=null;
+      resizeCharts();
+      runtime.focusCooldownTimer=setTimeout(()=>{
+        panel.classList.remove('focus-cooldown');
+        runtime.focusCooldownTimer=null;
+      },180);
+    },330);
+    setTimeout(resizeCharts,80);
+    return;
+  }
+  document.getElementById('focus-scrim').classList.remove('show');
+  clearFocusPlaceholder();
+  setTimeout(resizeCharts,80);
+}
+document.getElementById('focus-scrim').addEventListener('click',closeFocusedPanel);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeFocusedPanel();});
+
+function sec(ms){return Math.max(1,Math.round((ms||0)/1000));}
+function refreshControlFields(){
+  const ddos=state.config.ddos,scan=state.config.scan;
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.value=value;};
+  set('cfg-ddos-max',ddos.max_conns_per_window);
+  set('cfg-ddos-block',sec(ddos.block_ms));
+  set('cfg-scan-ports',scan.distinct_ports_threshold);
+  set('cfg-scan-block',sec(scan.block_ms));
+  const dd=document.getElementById('thr-ddos'),sc=document.getElementById('thr-scan');
+  if(dd)dd.textContent=`${ddos.max_conns_per_window} conn / ${sec(ddos.window_ms)}s`;
+  if(sc)sc.textContent=`${scan.distinct_ports_threshold} ports / ${sec(scan.window_ms)}s`;
+  document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',!!state.toggles[el.dataset.toggle]));
+}
+async function applyConfig(){
+  const num=(id,fallback)=>Math.max(1,parseInt(document.getElementById(id)?.value||fallback,10)||fallback);
+  state.config.ddos.enabled=!!state.toggles.ddos;
+  state.config.scan.enabled=!!state.toggles.scan;
+  state.config.ddos.max_conns_per_window=num('cfg-ddos-max',state.config.ddos.max_conns_per_window);
+  state.config.ddos.block_ms=num('cfg-ddos-block',sec(state.config.ddos.block_ms))*1000;
+  state.config.scan.distinct_ports_threshold=num('cfg-scan-ports',state.config.scan.distinct_ports_threshold);
+  state.config.scan.block_ms=num('cfg-scan-block',sec(state.config.scan.block_ms))*1000;
+  refreshControlFields();
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_config',{config:state.config});
+}
+function refreshSettingSwitches(){
+  document.querySelectorAll('[data-setting-toggle]').forEach(el=>el.classList.toggle('on',!!state.appSettings[el.dataset.settingToggle]));
+}
+async function toggleSetting(key,el){
+  state.appSettings[key]=!state.appSettings[key];
+  el.classList.toggle('on',!!state.appSettings[key]);
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_app_settings',{settings:state.appSettings});
+}
+
+// ---- settings + per-application connection decisions ---------------------
+function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function updateNotice(){const b=document.getElementById('notice-badge'),n=state.promptQueue.length+(state.activePrompt?1:0);b.textContent=n;b.classList.toggle('show',n>0);}
+function keyOf(path){return String(path||'').trim().toLowerCase();}
+function appNameFromPath(path){return String(path||'?').split(/[\\/]/).filter(Boolean).pop()||'?';}
+function protoLabel(p){return p==='tcp'?'TCP':p==='udp'?'UDP':'TCP+UDP';}
+function statusLabel(s){return s==='waiting'?'karar bekliyor':s==='session'?'oturum karantinası':s==='remembered'?'kayıtlı, uygulanacak':'karantinada';}
+function quarantineItems(){
+  const map=new Map();
+  state.appQuarantines.forEach(q=>{if(q?.appPath)map.set(keyOf(q.appPath),q);});
+  state.programRules.filter(r=>r.decision==='quarantine').forEach(r=>{
+    const key=keyOf(r.appPath),existing=map.get(key);
+    map.set(key,{...r,status:existing?.status||'enforced',active:existing?.active!==false,temporary:false});
+  });
+  [state.activePrompt,...state.promptQueue].filter(Boolean).forEach(p=>{
+    map.set(keyOf(p.appPath),{appPath:p.appPath,appName:p.appName,protocol:'all',status:'waiting',active:true,temporary:true});
+  });
+  return [...map.values()].sort((a,b)=>{
+    const rank=v=>({waiting:0,session:1,enforced:2,remembered:3}[v.status]??4);
+    return rank(a)-rank(b)||String(a.appName).localeCompare(String(b.appName),'tr');
+  });
+}
+function paintQuarantine(){
+  const root=document.getElementById('quarantine-list');if(!root)return;
+  const items=quarantineItems();
+  root.innerHTML=items.length?items.slice(0,5).map(q=>{
+    const waiting=q.status==='waiting';
+    const statusClass=waiting?'wait':'hot';
+    const controls=waiting
+      ? `<span class="pill wait">modal açık</span>`
+      : `<button class="tinybtn allow" data-q-action="allow" data-q-path="${esc(q.appPath)}">İzin ver</button><button class="tinybtn danger" data-q-action="remove" data-q-path="${esc(q.appPath)}">Sil</button>`;
+    return `<div class="qrow ${waiting?'wait':''}">
+      <div><div class="qname">${esc(q.appName||appNameFromPath(q.appPath))}</div>
+      <div class="qpath">${esc(q.appPath)}</div>
+      <div class="qmeta"><span class="pill ${statusClass}">${statusLabel(q.status)}</span><span class="pill">${protoLabel(q.protocol)}</span></div></div>
+      <div class="qactions">${controls}</div>
+    </div>`;
+  }).join(''):'<div class="empty">Karantinada uygulama yok — şimdilik temiz.</div>';
+}
+async function handleQuarantineAction(button){
+  const path=button.dataset.qPath,action=button.dataset.qAction;
+  if(!path)return;
+  if(action==='allow'){
+    const hasRule=state.programRules.some(r=>keyOf(r.appPath)===keyOf(path));
+    if(hasTauriApi){
+      if(hasRule)await window.__TAURI__.core.invoke('set_program_rule_decision',{appPath:path,decision:'allow',protocol:'all'});
+      else await window.__TAURI__.core.invoke('remove_program_rule',{appPath:path});
+    }
+    state.programRules=state.programRules.map(r=>keyOf(r.appPath)===keyOf(path)?{...r,decision:'allow',protocol:'all'}:r);
+    state.sessionProgramRules=state.sessionProgramRules.map(r=>keyOf(r.appPath)===keyOf(path)?{...r,decision:'allow',protocol:'all'}:r);
+  } else if(action==='remove'){
+    if(hasTauriApi)await window.__TAURI__.core.invoke('remove_program_rule',{appPath:path});
+    state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path));
+    state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path));
+  }
+  state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));
+  paintQuarantine();paintRules();paintConnections();
+}
+function paintRules(){
+  const root=document.getElementById('program-rules');
+  root.innerHTML=state.programRules.length?state.programRules.map(r=>`<div class="rule-row"><div><b>${esc(r.appName)}</b><small>${esc(r.appPath)}</small></div><span class="rule-status ${esc(r.decision)}">${r.decision==='allow'?'izinli':'karantina'} · ${esc(r.protocol)}</span><button class="rule-remove" data-rule-path="${esc(r.appPath)}" title="Kararı sil">×</button></div>`).join(''):'<div class="empty">Henüz hatırlanan uygulama kararı yok.</div>';
+}
+function openSettings(){
+  document.getElementById('setting-startup').checked=!!state.appSettings.launchOnStartup;
+  document.getElementById('setting-tray').checked=!!state.appSettings.closeToTray;
+  document.getElementById('setting-ask').checked=!!state.appSettings.askNewApps;
+  paintRules();paintQuarantine();document.getElementById('settings-overlay').classList.add('show');
+}
+function closeSettings(){document.getElementById('settings-overlay').classList.remove('show');}
+async function saveSettings(){
+  const settings={launchOnStartup:document.getElementById('setting-startup').checked,closeToTray:document.getElementById('setting-tray').checked,askNewApps:document.getElementById('setting-ask').checked};
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_app_settings',{settings});
+  state.appSettings=settings;refreshSettingSwitches();closeSettings();
+}
+function queueProgram(prompt){
+  if(!prompt||state.activePrompt?.id===prompt.id||state.promptQueue.some(p=>p.id===prompt.id))return;
+  state.promptQueue.push(prompt);updateNotice();paintQuarantine();paintConnections();showNextProgram();
+}
+function showNextProgram(){
+  if(state.activePrompt||!state.promptQueue.length)return;
+  const p=state.activePrompt=state.promptQueue.shift();
+  document.getElementById('prompt-name').textContent=p.appName;
+  document.getElementById('prompt-path').textContent=p.appPath;
+  document.getElementById('prompt-icon').textContent=(p.appName||'?').slice(0,1).toUpperCase();
+  document.getElementById('prompt-direction').textContent=p.direction==='outbound'?'Dışarı giden':'İçeri gelen';
+  document.getElementById('prompt-protocol').textContent=String(p.protocol||'').toUpperCase();
+  document.getElementById('prompt-target').textContent=`${p.remoteIp}:${p.remotePort}`;
+  document.getElementById('prompt-scope').value='all';document.getElementById('prompt-remember').checked=true;
+  document.getElementById('first-packet-note').style.display=p.firstConnectionMayHavePassed?'block':'none';
+  document.getElementById('program-overlay').classList.add('show');updateNotice();paintQuarantine();paintConnections();
+}
+async function decideProgram(decision){
+  const p=state.activePrompt;if(!p)return;
+  const protocol=document.getElementById('prompt-scope').value,remember=document.getElementById('prompt-remember').checked;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('decide_program',{requestId:p.id,decision,protocol,remember});
+  const localRule={appPath:p.appPath,appName:p.appName,decision,protocol,temporary:!remember};
+  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
+  state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
+  if(remember)state.programRules=state.programRules.concat([localRule]);
+  else state.sessionProgramRules=state.sessionProgramRules.concat([localRule]);
+  state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(p.appPath));
+  if(decision==='quarantine')state.appQuarantines.push({appPath:p.appPath,appName:p.appName,protocol,status:remember?'enforced':'session',active:true,temporary:!remember});
+  state.activePrompt=null;document.getElementById('program-overlay').classList.remove('show');updateNotice();paintQuarantine();paintRules();paintConnections();showNextProgram();
+}
+
+document.getElementById('settings-btn').addEventListener('click',openSettings);
+document.getElementById('settings-close').addEventListener('click',closeSettings);
+document.getElementById('settings-cancel').addEventListener('click',closeSettings);
+document.getElementById('settings-save').addEventListener('click',()=>saveSettings().catch(console.error));
+document.getElementById('allow-btn').addEventListener('click',()=>decideProgram('allow').catch(console.error));
+document.getElementById('quarantine-btn').addEventListener('click',()=>decideProgram('quarantine').catch(console.error));
+document.getElementById('program-rules').addEventListener('click',async e=>{const button=e.target.closest('[data-rule-path]');if(!button)return;const path=button.dataset.rulePath;if(hasTauriApi)await window.__TAURI__.core.invoke('remove_program_rule',{appPath:path});state.programRules=state.programRules.filter(r=>r.appPath!==path);state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path));state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));paintRules();paintQuarantine();paintConnections();});
+
+// ---- block list + talkers rendering ---------------------------------------
+function paintBlocks(){
+  const bl=document.getElementById('blocklist'); if(!bl)return;
+  const n=document.getElementById('active-n'), sub=document.getElementById('active-sub');
+  if(n){n.textContent=state.blocks.length;n.classList.toggle('warn',state.blocks.length>0);}
+  if(sub)sub.textContent=state.blocks.length?`${state.blocks.length} source${state.blocks.length>1?'s':''} under active block`:'no active enforcement';
+  bl.innerHTML = state.blocks.length? state.blocks.slice(0,4).map(b=>`
+    <div class="brow"><span class="ip">${b.ip}</span>
+    <span class="tag ${b.reason==='scan'?'scan':'rl'}">${b.reason==='scan'?'scan':b.reason==='manual'?'manual':'flood'}</span>
+    <span class="ttl">${b.ttl}s</span></div>`).join('') : `<div class="empty">nothing blocked — all clear</div>`;
+}
+function paintTalkers(){
+  const t=document.getElementById('talkers'); if(!t)return;
+  const mx=Math.max(1,...state.talkers.map(x=>x.n));
+  t.innerHTML=state.talkers.slice(0,6).map(x=>`
+    <div class="talker ${x.flag?'flag':''}"><span>${x.ip}</span>
+    <div class="bar"><i style="width:${Math.round(x.n/mx*100)}%"></i></div>
+    <span class="n">${x.n}</span></div>`).join('');
+}
+
+function queueConnection(conn){
+  if(!conn)return;
+  state.connections.unshift(conn);
+  if(state.connections.length>250)state.connections.length=250;
+  if(conn.verdict==='block')state.connectionBlocked++;
+  if(conn.appPath)runtime.seenApps.set(keyOf(conn.appPath),{appPath:conn.appPath,appName:conn.appName||appNameFromPath(conn.appPath),count:(runtime.seenApps.get(keyOf(conn.appPath))?.count||0)+1,last:conn});
+  runtime.seenRemotes.set(conn.remoteIp,{ip:conn.remoteIp,count:(runtime.seenRemotes.get(conn.remoteIp)?.count||0)+1,last:conn});
+  paintConnections();
+}
+function paintConnections(){
+  const total=document.getElementById('conn-total'),apps=document.getElementById('conn-apps'),remotes=document.getElementById('conn-remotes'),blocked=document.getElementById('conn-blocked');
+  if(total)total.textContent=state.connections.length;
+  if(apps)apps.textContent=runtime.seenApps.size;
+  if(remotes)remotes.textContent=runtime.seenRemotes.size;
+  if(blocked)blocked.textContent=state.connectionBlocked;
+
+  const root=document.getElementById('connection-list');
+  if(root){
+    root.innerHTML=state.connections.length?state.connections.slice(0,70).map(c=>{
+      const hasApp=!!c.appPath;
+      const stamp=new Date(c.tsMs||c.ts_ms||Date.now()).toLocaleTimeString('tr-TR');
+      return `<div class="conn-row ${c.verdict==='block'?'block':''}">
+        <div class="conn-app"><b>${esc(c.appName||appNameFromPath(c.appPath)||'unknown app')}</b><small>${esc(c.appPath||('pid '+(c.pid??'?')))}</small></div>
+        <div class="conn-remote"><b>${esc(c.remoteIp)}:${esc(c.remotePort)}</b><small>local ${esc(c.localPort)} · ${stamp}</small></div>
+        <div class="conn-meta"><span class="pill ${c.verdict==='block'?'hot':''}">${esc(c.verdict||'allow')}</span> <span class="pill">${esc(c.direction)}</span> <span class="pill">${protoLabel(c.protocol)}</span></div>
+        <div class="conn-actions">
+          <button class="tinybtn danger" data-conn-action="quarantine" data-app-path="${esc(c.appPath||'')}" ${hasApp?'':'disabled'}>Karantina</button>
+          <button class="tinybtn allow" data-conn-action="allow" data-app-path="${esc(c.appPath||'')}" ${hasApp?'':'disabled'}>İzin ver</button>
+          <button class="tinybtn danger" data-ip-action="block" data-ip="${esc(c.remoteIp)}">IP block</button>
+        </div>
+      </div>`;
+    }).join(''):'<div class="empty">Henüz canlı bağlantı gözlemlenmedi.</div>';
+  }
+
+  const appsRoot=document.getElementById('apps-on-wire');
+  if(appsRoot){
+    appsRoot.innerHTML=[...runtime.seenApps.values()].sort((a,b)=>b.count-a.count).slice(0,12).map(a=>`<div class="mini-row"><span>${esc(a.appName)}</span><b>${a.count}</b></div>`).join('')||'<div class="empty">Uygulama yok.</div>';
+  }
+  const remoteRoot=document.getElementById('remote-targets');
+  if(remoteRoot){
+    remoteRoot.innerHTML=[...runtime.seenRemotes.values()].sort((a,b)=>b.count-a.count).slice(0,12).map(r=>`<div class="mini-row"><span>${esc(r.ip)}</span><b>${r.count}</b></div>`).join('')||'<div class="empty">Endpoint yok.</div>';
+  }
+}
+async function handleConnectionAction(button){
+  const path=button.dataset.appPath,action=button.dataset.connAction;
+  if(!path)return;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_program_rule_decision',{appPath:path,decision:action==='allow'?'allow':'quarantine',protocol:'all'});
+  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:action==='allow'?'allow':'quarantine',protocol:'all'}]);
+  state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));
+  if(action!=='allow')state.appQuarantines.push({appPath:path,appName:appNameFromPath(path),protocol:'all',status:'enforced',active:true,temporary:false});
+  paintQuarantine();paintRules();paintConnections();
+}
+async function handleIpAction(button){
+  const ip=button.dataset.ip;if(!ip)return;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('block_remote_ip',{ip,minutes:60});
+  state.blocks=state.blocks.filter(b=>b.ip!==ip).concat([{ip,reason:'manual',ttl:3600}]);
+  paintBlocks();
+}
+document.getElementById('connections-view').addEventListener('click',e=>{
+  const conn=e.target.closest('[data-conn-action]');if(conn){handleConnectionAction(conn).catch(console.error);return;}
+  const ip=e.target.closest('[data-ip-action]');if(ip){handleIpAction(ip).catch(console.error);}
+});
+
+// ---- network tree + selected process control ------------------------------
+function connTs(c){return c.tsMs??c.ts_ms??Date.now();}
+function connRemote(c){return c.remoteIp??c.remote_ip??'?';}
+function connRemotePort(c){return c.remotePort??c.remote_port??'?';}
+function connLocalPort(c){return c.localPort??c.local_port??'?';}
+function appInitials(name){
+  return String(name||'?').replace(/\.[^.]+$/,'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'?';
+}
+function normalizeConnection(conn){
+  const appPath=conn.appPath??conn.app_path??'';
+  const pid=conn.pid??'?';
+  const appName=conn.appName??conn.app_name??(appPath?appNameFromPath(appPath):(pid===0?'System / kernel':'pid '+pid));
+  return {
+    ...conn,
+    tsMs:connTs(conn),
+    appPath,
+    appName,
+    direction:String(conn.direction??'unknown').toLowerCase(),
+    protocol:String(conn.protocol??'all').toLowerCase(),
+    remoteIp:String(connRemote(conn)),
+    remotePort:connRemotePort(conn),
+    localPort:connLocalPort(conn),
+    verdict:String(conn.verdict??'allow').toLowerCase(),
+  };
+}
+function appIdentity(conn){
+  if(conn.appPath){
+    return {key:'path:'+keyOf(conn.appPath),name:conn.appName||appNameFromPath(conn.appPath),sub:conn.appPath,appPath:conn.appPath,pid:conn.pid};
+  }
+  const pid=conn.pid??'?';
+  const name=conn.appName||(pid===0?'System / kernel':'pid '+pid);
+  return {key:`pid:${pid}:${keyOf(name)}`,name,sub:`pid ${pid} · app path unavailable`,appPath:'',pid};
+}
+function bumpMap(map,key,amount=1){map.set(key,(map.get(key)||0)+amount);}
+function allConnectionRows(){
+  const map=new Map();
+  state.connections.forEach(c=>map.set(c.id||`${c.tsMs}-${c.pid}-${c.remoteIp}-${c.remotePort}`,c));
+  state.connectionSnapshot.forEach(c=>map.set(c.id||`snapshot-${c.pid}-${c.protocol}-${c.localPort}-${c.remoteIp}-${c.remotePort}`,c));
+  return [...map.values()];
+}
+function connectionGroups(){
+  const groups=new Map();
+  for(const c of allConnectionRows()){
+    const id=appIdentity(c);
+    let g=groups.get(id.key);
+    if(!g){
+      g={...id,count:0,blocked:0,allowed:0,lastTs:0,last:c,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map()};
+      groups.set(id.key,g);
+    }
+    g.count++; if(c.verdict==='block')g.blocked++; else g.allowed++;
+    g.lastTs=Math.max(g.lastTs,connTs(c)); if(connTs(c)>=connTs(g.last))g.last=c;
+    g.connections.push(c);
+    bumpMap(g.protocols,protoLabel(c.protocol));
+    bumpMap(g.directions,c.direction||'unknown');
+    const remoteKey=`${c.remoteIp}:${c.remotePort}`;
+    let r=g.remotes.get(remoteKey);
+    if(!r){r={ip:c.remoteIp,port:c.remotePort,count:0,blocked:0,allowed:0,last:c};g.remotes.set(remoteKey,r);}
+    r.count++; if(c.verdict==='block')r.blocked++; else r.allowed++; if(connTs(c)>=connTs(r.last))r.last=c;
+  }
+  return [...groups.values()].sort((a,b)=>b.lastTs-a.lastTs);
+}
+function topMapLabel(map,limit=2){
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([k,v])=>`${k} ${v}`).join(' · ')||'—';
+}
+function emptyAppGroup({key,name,sub,appPath='',pid='?'}) {
+  return {key,name,sub,appPath,pid,count:0,blocked:0,allowed:0,lastTs:0,last:null,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map(),observedCount:0,rule:null,quarantine:null,pending:null,status:'observed'};
+}
+function ensureInventoryGroup(map, app){
+  let g=map.get(app.key);
+  if(!g){g=emptyAppGroup(app);map.set(app.key,g);}
+  return g;
+}
+function appKeyFromPath(path){return 'path:'+keyOf(path);}
+function pendingPrograms(){return [state.activePrompt,...state.promptQueue].filter(Boolean);}
+function applyAppStatus(g){
+  if(g.pending){g.status='pending';return g;}
+  if(g.rule?.decision==='quarantine'||g.quarantine||g.blocked>0){g.status='blocked';return g;}
+  if(g.rule?.decision==='allow'){g.status='allowed';return g;}
+  g.status='observed';return g;
+}
+function applicationGroups(){
+  const map=new Map();
+  connectionGroups().forEach(g=>{g.observedCount=g.count;map.set(g.key,g);});
+  runtime.seenApps.forEach(a=>{
+    const g=ensureInventoryGroup(map,{key:a.key,name:a.name||a.appName||appNameFromPath(a.appPath),sub:a.sub||a.appPath||`pid ${a.pid??'?'}`,appPath:a.appPath||'',pid:a.pid});
+    g.observedCount=Math.max(g.observedCount||0,a.count||0);
+    if(!g.last&&a.last)g.last=a.last;
+  });
+  state.programRules.forEach(r=>{
+    if(!r?.appPath)return;
+    const g=ensureInventoryGroup(map,{key:appKeyFromPath(r.appPath),name:r.appName||appNameFromPath(r.appPath),sub:r.appPath,appPath:r.appPath});
+    g.rule=r;g.name=r.appName||g.name;g.sub=r.appPath;g.appPath=r.appPath;
+  });
+  state.sessionProgramRules.forEach(r=>{
+    if(!r?.appPath)return;
+    const g=ensureInventoryGroup(map,{key:appKeyFromPath(r.appPath),name:r.appName||appNameFromPath(r.appPath),sub:r.appPath,appPath:r.appPath});
+    g.rule={...r,temporary:true};g.name=r.appName||g.name;g.sub=r.appPath;g.appPath=r.appPath;
+  });
+  state.appQuarantines.forEach(q=>{
+    if(!q?.appPath)return;
+    const g=ensureInventoryGroup(map,{key:appKeyFromPath(q.appPath),name:q.appName||appNameFromPath(q.appPath),sub:q.appPath,appPath:q.appPath});
+    g.quarantine=q;g.name=q.appName||g.name;g.sub=q.appPath;g.appPath=q.appPath;
+  });
+  pendingPrograms().forEach(p=>{
+    if(!p?.appPath)return;
+    const g=ensureInventoryGroup(map,{key:appKeyFromPath(p.appPath),name:p.appName||appNameFromPath(p.appPath),sub:p.appPath,appPath:p.appPath});
+    g.pending=p;g.name=p.appName||g.name;g.sub=p.appPath;g.appPath=p.appPath;
+  });
+  return [...map.values()].map(applyAppStatus).sort((a,b)=>{
+    const rank={pending:0,blocked:1,allowed:2,observed:3};
+    return (rank[a.status]-rank[b.status])||(b.lastTs-a.lastTs)||String(a.name).localeCompare(String(b.name),'tr');
+  });
+}
+function sectionedApps(groups){
+  const sections=[
+    ['pending','Karar bekleyen'],
+    ['blocked','Engellenen / karantina'],
+    ['allowed','İzin verilen'],
+    ['observed','Gözlenen / kuralsız'],
+  ];
+  return sections.map(([status,title])=>({status,title,items:groups.filter(g=>g.status===status)})).filter(s=>s.items.length);
+}
+function statusPill(g){
+  if(g.status==='pending')return '<span class="pill wait">sorulacak</span>';
+  if(g.status==='blocked')return `<span class="pill hot">${g.rule?.temporary?'oturum engelli':'engelli'}</span>`;
+  if(g.status==='allowed')return `<span class="pill">${g.rule?.temporary?'oturum izinli':'izinli'}</span>`;
+  return '<span class="pill">gözlenen</span>';
+}
+function initConnectionMetric(){
+  const canvas=document.getElementById('conn-live-canvas');
+  if(canvas && !state.charts.connLive){
+    state.charts.connLive=new Signal(canvas,{cap:60,max:8,grid:false,series:[{key:'flow',color:getVar('--inbound'),fill:true}]});
+  }
+}
+function flushConnectionPulse(){
+  const live=document.getElementById('conn-live-count');
+  if(live)live.textContent=state.connectionPulse;
+  state.charts.connLive?.push({flow:state.connectionPulse});
+  state.connectionPulse=0;
+}
+function isBlockableIp(ip){
+  const value=String(ip||'');
+  return value && value!=='?' && value!=='0.0.0.0' && value!=='::' && value!=='::0';
+}
+function queueConnection(conn){
+  if(!conn)return;
+  const normalized=normalizeConnection(conn);
+  state.connections.unshift(normalized);
+  state.connectionSeenTotal++;
+  state.connectionPulse++;
+  if(state.connections.length>300)state.connections.length=300;
+  if(normalized.verdict==='block')state.connectionBlocked++;
+  const id=appIdentity(normalized);
+  const prev=runtime.seenApps.get(id.key)||{...id,count:0,last:normalized};
+  runtime.seenApps.set(id.key,{...prev,...id,count:prev.count+1,last:normalized});
+  if(!runtime.selectedAppKey){runtime.selectedAppKey=id.key;runtime.expandedApps.add(id.key);}
+  if(normalized.remoteIp&&normalized.remoteIp!=='?')runtime.seenRemotes.set(normalized.remoteIp,{ip:normalized.remoteIp,count:(runtime.seenRemotes.get(normalized.remoteIp)?.count||0)+1,last:normalized});
+  paintConnections();
+}
+function queueConnectionSnapshot(payload){
+  const rows=Array.isArray(payload)?payload:[];
+  state.connectionSnapshot=rows.map(normalizeConnection).slice(0,600);
+  state.connectionSnapshot.forEach(c=>{
+    const id=appIdentity(c);
+    const prev=runtime.seenApps.get(id.key)||{...id,count:0,last:c};
+    runtime.seenApps.set(id.key,{...prev,...id,count:Math.max(prev.count||0,1),last:c});
+    if(isBlockableIp(c.remoteIp)){
+      const prevRemote=runtime.seenRemotes.get(c.remoteIp)||{ip:c.remoteIp,count:0,last:c};
+      runtime.seenRemotes.set(c.remoteIp,{ip:c.remoteIp,count:Math.max(prevRemote.count||0,1),last:c});
+    }
+  });
+  paintConnections();
+}
+function renderConnectionChild(c){
+  const stamp=new Date(connTs(c)).toLocaleTimeString('tr-TR');
+  const canBlock=isBlockableIp(c.remoteIp);
+  return `<div class="tree-conn ${c.verdict==='block'?'block':''}">
+    <div><b>${esc(c.remoteIp)}:${esc(c.remotePort)}</b><small>local ${esc(c.localPort)} · ${stamp}</small></div>
+    <div><span class="pill ${c.verdict==='block'?'hot':''}">${esc(c.verdict||'allow')}</span> <span class="pill">${esc(c.direction)}</span> <span class="pill">${protoLabel(c.protocol)}</span></div>
+    <div class="conn-actions"><button class="tinybtn danger" data-ip-action="block" data-ip="${esc(c.remoteIp)}" ${canBlock?'':'disabled'}>IP block</button></div>
+  </div>`;
+}
+function renderAppGroup(g){
+  const open=runtime.expandedApps.has(g.key),selected=runtime.selectedAppKey===g.key,hasApp=!!g.appPath;
+  const latest=g.lastTs?new Date(g.lastTs).toLocaleTimeString('tr-TR'):'not observed this session';
+  const children=open?g.connections.slice(0,18).map(renderConnectionChild).join('')+(g.connections.length>18?`<div class="tree-empty">+${g.connections.length-18} older connection hidden in this view</div>`:''):'';
+  const canDecide=hasApp&&g.status!=='pending';
+  return `<div class="tree-app ${open?'open':''} ${selected?'selected':''} ${g.blocked?'has-block':''} ${esc(g.status)}" data-app-key="${esc(g.key)}">
+    <div class="tree-head">
+      <button class="tree-toggle" data-tree-toggle="${esc(g.key)}" title="Bağlantıları aç/kapat">›</button>
+      <div class="tree-icon">${esc(appInitials(g.name))}</div>
+      <div class="tree-name"><b>${esc(g.name)}</b><small>${esc(g.sub)} · last ${latest}</small></div>
+      <div class="tree-kpis">
+        ${statusPill(g)}
+        <span class="pill">${g.observedCount||g.count||0} flow</span>
+        ${g.blocked?`<span class="pill hot">${g.blocked} block</span>`:`<span class="pill">${g.allowed} allow</span>`}
+        <span class="pill">${g.remotes.size} endpoint</span>
+        <button class="tinybtn danger" data-conn-action="quarantine" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>Karantina</button>
+        <button class="tinybtn allow" data-conn-action="allow" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>İzin ver</button>
+      </div>
+    </div>
+    ${open?`<div class="tree-children">${children||'<div class="tree-empty">Bu process için detay yok.</div>'}</div>`:''}
+  </div>`;
+}
+function paintAppDetail(groups){
+  const root=document.getElementById('app-detail'); if(!root)return;
+  if(!groups.length){root.innerHTML='<div class="detail-empty">Bir bağlantı yakalandığında process detayları burada görünecek.</div>';return;}
+  if(!runtime.selectedAppKey||!groups.some(g=>g.key===runtime.selectedAppKey))runtime.selectedAppKey=groups[0].key;
+  const g=groups.find(x=>x.key===runtime.selectedAppKey)||groups[0];
+  const hasApp=!!g.appPath,canDecide=hasApp&&g.status!=='pending',latest=g.last||{},canBlockLatest=isBlockableIp(latest.remoteIp);
+  const endpoints=[...g.remotes.values()].sort((a,b)=>b.count-a.count);
+  root.innerHTML=`<div class="detail-hero">
+    <div class="detail-icon">${esc(appInitials(g.name))}</div>
+    <div class="detail-title"><b>${esc(g.name)}</b><small>${esc(g.sub)}</small></div>
+  </div>
+  <div class="detail-grid">
+    <div class="detail-stat"><small>status</small><b>${esc(g.status)}</b></div>
+    <div class="detail-stat"><small>flows</small><b>${g.observedCount||g.count||0}</b></div>
+    <div class="detail-stat"><small>blocked</small><b style="color:${g.blocked?'var(--block)':'var(--ink)'}">${g.blocked}</b></div>
+  </div>
+  <div class="detail-actions">
+    <button class="tinybtn danger" data-conn-action="quarantine" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>Karantinaya al</button>
+    <button class="tinybtn allow" data-conn-action="allow" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>İzin ver</button>
+    <button class="tinybtn danger" data-ip-action="block" data-ip="${esc(latest.remoteIp||'')}" ${canBlockLatest?'':'disabled'}>Son IP block</button>
+  </div>
+  <div class="detail-section"><h4>Connection mix</h4>
+    <div class="mini-row"><span>Protocols</span><b>${esc(topMapLabel(g.protocols,3))}</b></div>
+    <div class="mini-row"><span>Directions</span><b>${esc(topMapLabel(g.directions,3))}</b></div>
+    <div class="mini-row"><span>Latest target</span><b>${esc((latest.remoteIp||'?')+':'+(latest.remotePort||'?'))}</b></div>
+  </div>
+  <div class="detail-section"><h4>Observed endpoints</h4>
+    ${endpoints.slice(0,10).map(r=>`<div class="detail-endpoint"><span>${esc(r.ip)}:${esc(r.port)}</span><b>${r.count}${r.blocked?` · ${r.blocked} blocked`:''}</b></div>`).join('')||'<div class="tree-empty">Endpoint yok.</div>'}
+  </div>`;
+}
+function paintConnections(){
+  const groups=applicationGroups();
+  const total=document.getElementById('conn-total'),apps=document.getElementById('conn-apps'),remotes=document.getElementById('conn-remotes'),blocked=document.getElementById('conn-blocked');
+  if(total)total.textContent=state.connectionSeenTotal||state.connections.length;
+  if(apps)apps.textContent=groups.length;
+  if(remotes)remotes.textContent=runtime.seenRemotes.size;
+  if(blocked)blocked.textContent=state.connectionBlocked;
+  const root=document.getElementById('connection-list');
+  if(root){
+    const sections=sectionedApps(groups);
+    root.innerHTML=sections.length?`<div class="app-tree">${sections.map(s=>`<div class="app-section"><div class="app-section-title"><span>${esc(s.title)}</span><b>${s.items.length}</b></div>${s.items.map(renderAppGroup).join('')}</div>`).join('')}</div>`:'<div class="empty">Henüz program gözlemlenmedi. Yeni outbound bağlantılar burada simplewall tarzı listelenecek.</div>';
+  }
+  paintAppDetail(groups);
+  const remoteRoot=document.getElementById('remote-targets');
+  if(remoteRoot){
+    remoteRoot.innerHTML=[...runtime.seenRemotes.values()].sort((a,b)=>b.count-a.count).slice(0,12).map(r=>`<div class="mini-row"><span>${esc(r.ip)}</span><b>${r.count}</b></div>`).join('')||'<div class="empty">Endpoint yok.</div>';
+  }
+}
+async function handleConnectionAction(button){
+  const path=button.dataset.appPath,action=button.dataset.connAction;
+  if(!path)return;
+  const group=applicationGroups().find(g=>keyOf(g.appPath)===keyOf(path));
+  const appName=group?.name||appNameFromPath(path);
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_program_rule_decision',{appPath:path,decision:action==='allow'?'allow':'quarantine',protocol:'all'});
+  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName,decision:action==='allow'?'allow':'quarantine',protocol:'all'}]);
+  state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path));
+  state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));
+  if(action!=='allow')state.appQuarantines.push({appPath:path,appName,protocol:'all',status:'enforced',active:true,temporary:false});
+  paintQuarantine();paintRules();paintConnections();
+}
+async function handleIpAction(button){
+  const ip=button.dataset.ip;if(!ip)return;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('block_remote_ip',{ip,minutes:60});
+  state.blocks=state.blocks.filter(b=>b.ip!==ip).concat([{ip,reason:'manual',ttl:3600}]);
+  paintBlocks();paintConnections();
+}
+document.getElementById('connections-view').addEventListener('click',e=>{
+  if(e.target.closest('[data-conn-action],[data-ip-action]'))return;
+  const toggle=e.target.closest('[data-tree-toggle]');
+  if(toggle){
+    const key=toggle.dataset.treeToggle;
+    runtime.selectedAppKey=key;
+    runtime.expandedApps.has(key)?runtime.expandedApps.delete(key):runtime.expandedApps.add(key);
+    paintConnections();return;
+  }
+  const node=e.target.closest('[data-app-key]');
+  if(node){runtime.selectedAppKey=node.dataset.appKey;paintConnections();}
+});
+
+// ---- data pipeline: Tauri events OR simulator -----------------------------
+function applyTick(m){
+  // m: {inbound,outbound,flood,scan,unique,drop, blocks[], talkers[], eps,blk}
+  state.charts.signal?.push({inbound:m.inbound,outbound:m.outbound});
+  state.charts.threat?.push({flood:m.flood,scan:m.scan});
+  state.charts.unique?.push({unique:m.unique});
+  state.charts.rate?.push({drop:m.drop});
+  if(m.blocks) state.blocks=m.blocks;
+  if(m.talkers) state.talkers=m.talkers;
+  const eps=document.getElementById('t-eps'),blk=document.getElementById('t-blk'),ips=document.getElementById('t-ips');
+  if(eps)eps.textContent=m.inbound+m.outbound;
+  if(blk)blk.textContent=m.flood+m.scan;
+  if(ips)ips.textContent=m.unique;
+  paintBlocks();paintTalkers();
+}
+function frame(){Object.values(state.charts).forEach(c=>c.draw());requestAnimationFrame(frame);}
+
+// ---- simulator (browser preview) ------------------------------------------
+function startSimulator(){
+  let t=0, attack=null, blocks=[], pool=[];
+  const rip=()=>`${185+(Math.random()*3|0)}.${Math.random()*255|0}.${Math.random()*255|0}.${Math.random()*255|0}`;
+  const apps=[
+    ['chrome.exe','C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'],
+    ['discord.exe','C:\\Users\\micro\\AppData\\Local\\Discord\\app\\Discord.exe'],
+    ['steam.exe','C:\\Program Files (x86)\\Steam\\steam.exe'],
+    ['unknown-sync.exe','C:\\Users\\micro\\AppData\\Roaming\\unknown-sync.exe'],
+    ['powershell.exe','C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'],
+  ];
+  for(let i=0;i<12;i++)pool.push({ip:rip(),n:0,flag:false});
+  setInterval(()=>{
+    t++;
+    // baseline traffic
+    let inbound=18+Math.round(8*Math.sin(t/7))+ (Math.random()*8|0);
+    let outbound=10+Math.round(5*Math.cos(t/9))+(Math.random()*6|0);
+    let flood=0,scan=0,unique=6+(Math.random()*6|0);
+    // occasionally launch an attack burst
+    if(!attack && Math.random()<0.06) attack={type:Math.random()<0.5?'flood':'scan',ttl:5+(Math.random()*6|0),ip:rip()};
+    if(attack){
+      if(attack.type==='flood'){inbound+=60+(Math.random()*40|0);flood=6+(Math.random()*10|0);}
+      else {inbound+=25;scan=4+(Math.random()*6|0);unique+=3;}
+      if(!blocks.find(b=>b.ip===attack.ip)) blocks.push({ip:attack.ip,reason:attack.type==='flood'?'flood':'scan',ttl:attack.type==='flood'?60:300});
+      attack.ttl--; if(attack.ttl<=0)attack=null;
+    }
+    // age blocks
+    blocks.forEach(b=>b.ttl--); blocks=blocks.filter(b=>b.ttl>0);
+    // talkers
+    pool.forEach(p=>{p.n=Math.max(0,p.n*0.85+(Math.random()*6));p.flag=false;});
+    if(attack){let p=pool[0];p.ip=attack.ip;p.n+=40;p.flag=true;pool.sort((a,b)=>b.n-a.n);}
+    const drop = Math.min(100, Math.round((flood+scan)/(inbound+outbound+ (flood+scan))*100));
+    applyTick({inbound,outbound,flood,scan,unique,drop,
+      blocks:blocks.map(b=>({...b})),
+      talkers:pool.map(p=>({ip:p.ip,n:Math.round(p.n),flag:p.flag})).sort((a,b)=>b.n-a.n)});
+    for(let i=0;i<Math.min(8,1+(Math.random()*4|0));i++){
+      const app=apps[Math.random()*apps.length|0],remote=rip(),proto=Math.random()<.25?'udp':'tcp';
+      queueConnection({id:`sim-${Date.now()}-${i}`,tsMs:Date.now(),appName:app[0],appPath:app[1],direction:Math.random()<.82?'outbound':'inbound',protocol:proto,remoteIp:remote,remotePort:proto==='udp'?443:80+(Math.random()*400|0),localPort:1024+(Math.random()*50000|0),pid:1000+(Math.random()*4000|0),verdict:Math.random()<.08?'block':'allow',isNewConn:true});
+    }
+  },1000);
+}
+
+function startTauri(){
+  const { listen } = window.__TAURI__.event;
+  listen('metrics-tick', e=>applyTick(e.payload));
+  listen('program-connection-request',e=>queueProgram(e.payload));
+  listen('connection-seen',e=>queueConnection(e.payload));
+  listen('connection-snapshot',e=>queueConnectionSnapshot(e.payload));
+  // pull initial config for thresholds/toggles
+  window.__TAURI__.core.invoke('get_state').then(s=>{
+    if(s?.toggles){state.toggles=s.toggles;
+      document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',state.toggles[el.dataset.toggle]));}
+    if(s?.config){state.config=s.config;refreshControlFields();}
+    if(s?.appSettings)state.appSettings=s.appSettings;
+    if(s?.programRules)state.programRules=s.programRules;
+    if(s?.sessionProgramRules)state.sessionProgramRules=s.sessionProgramRules;
+    if(s?.appQuarantines)state.appQuarantines=s.appQuarantines;
+    if(s?.pendingPrograms)s.pendingPrograms.forEach(queueProgram);
+    refreshSettingSwitches();paintQuarantine();paintConnections();
+    document.getElementById('statustxt').textContent=`${s?.backend||'WFP'} · live`;
+  }).catch(()=>{});
+}
+
+// ---- boot -----------------------------------------------------------------
+render();
+initConnectionMetric();
+setInterval(flushConnectionPulse,1000);
+frame();
+if(hasTauriApi) startTauri(); else startSimulator();
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+[package]
+name = "m0untain"
+version = "0.1.0"
+edition = "2021"
+description = "m0untain — host firewall with DDoS and scan shielding"
+default-run = "m0untain"
+
+[[bin]]
+name = "m0untain"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sentinel-core = { path = "../core" }
+
+# Windows Filtering Platform bindings — only compiled on Windows. The
+# non-Windows build uses the simulator in src/wfp/sim.rs and needs none of this.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_WindowsFilteringPlatform",
+    "Win32_Networking_WinSock",
+    "Win32_System_Rpc",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }

@@ -1,0 +1,14 @@
+/target/
+/src-tauri/target/
+/.agents/
+/.codex/
+/.vscode/
+/.idea/
+
+*.log
+*.tmp
+*.bak
+*.pdb
+
+Thumbs.db
+Desktop.ini
