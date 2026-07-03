@@ -1,0 +1,13 @@
+[package]
+name = "m0untain-service"
+version = "0.1.0"
+edition = "2021"
+description = "Windows service scaffold for m0untain default-deny firewall enforcement"
+
+[lib]
+name = "m0untain_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "m0untain-service"
+path = "src/main.rs"

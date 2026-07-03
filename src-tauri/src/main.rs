@@ -17,7 +17,10 @@ use sentinel_core::{
     build_tick, Action, Config, Direction, Engine, Metrics, NetEvent, Proto, Talkers, Verdict,
 };
 use serde::Serialize;
-use settings::{AppSettings, PersistentState, ProgramRule};
+use settings::{
+    AppSettings, NotificationRecord, PersistentState, ProgramRule, RuleProfile, RuleTarget,
+    GLOBAL_PROFILE_ID,
+};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WindowEvent};
@@ -43,6 +46,7 @@ struct ProgramPrompt {
     remote_ip: String,
     remote_port: u16,
     local_port: u16,
+    pid: u32,
     first_connection_may_have_passed: bool,
 }
 
@@ -62,6 +66,7 @@ struct ConnectionSeen {
     verdict: String,
     reason: Option<String>,
     is_new_conn: bool,
+    risk_labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -135,6 +140,8 @@ struct Shared {
     app_settings: Mutex<AppSettings>,
     program_rules: Mutex<HashMap<String, ProgramRule>>,
     session_program_rules: Mutex<HashMap<String, ProgramRule>>,
+    profiles: Mutex<Vec<RuleProfile>>,
+    notifications: Mutex<Vec<NotificationRecord>>,
     pending_programs: Mutex<HashMap<String, PendingProgram>>,
     app_blocks: Mutex<HashMap<String, RuntimeAppBlock>>,
     known_apps: Mutex<HashMap<String, KnownApp>>,
@@ -165,8 +172,11 @@ impl Shared {
 
     fn save(&self) -> Result<(), String> {
         let state = PersistentState {
+            schema_version: 2,
             settings: self.app_settings.lock().unwrap().clone(),
             rules: self.program_rules.lock().unwrap().clone(),
+            profiles: self.profiles.lock().unwrap().clone(),
+            notifications: self.notifications.lock().unwrap().clone(),
         };
         settings::save(&self.persistence_path, &state)
     }
@@ -183,26 +193,289 @@ fn app_name(path: &str) -> String {
         .to_string()
 }
 
+fn normalize_protocol(value: &str) -> String {
+    match value.to_lowercase().as_str() {
+        "tcp" => "tcp".to_string(),
+        "udp" => "udp".to_string(),
+        _ => "all".to_string(),
+    }
+}
+
+fn normalize_direction(value: &str) -> String {
+    match value.to_lowercase().as_str() {
+        "inbound" => "inbound".to_string(),
+        "both" => "both".to_string(),
+        _ => "outbound".to_string(),
+    }
+}
+
+fn normalize_decision(value: &str) -> Result<String, String> {
+    match value.to_lowercase().as_str() {
+        "allow" => Ok("allow".to_string()),
+        "block" => Ok("block".to_string()),
+        "quarantine" => Ok("quarantine".to_string()),
+        _ => Err("decision must be allow, block or quarantine".to_string()),
+    }
+}
+
+fn hex_id(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn target_is_specific(target: &Option<RuleTarget>) -> bool {
+    target.as_ref().is_some_and(|target| {
+        target.kind != "any" || !target.value.trim().is_empty() || target.port.is_some()
+    })
+}
+
+fn target_key(target: &Option<RuleTarget>) -> String {
+    let Some(target) = target else {
+        return "any".to_string();
+    };
+    format!(
+        "{}:{}:{}",
+        target.kind.to_lowercase(),
+        target.value.to_lowercase(),
+        target
+            .port
+            .map(|port| port.to_string())
+            .unwrap_or_else(|| "*".to_string())
+    )
+}
+
+fn rule_storage_key(rule: &ProgramRule) -> String {
+    let profile = if rule.profile_id.trim().is_empty() {
+        GLOBAL_PROFILE_ID
+    } else {
+        rule.profile_id.as_str()
+    };
+    let app = if !rule.app_path.trim().is_empty() {
+        app_key(&rule.app_path)
+    } else {
+        format!("app-id:{}", hex_id(&rule.app_id))
+    };
+    format!(
+        "{profile}|{}|{}|{}|{}",
+        app,
+        normalize_protocol(&rule.protocol),
+        normalize_direction(&rule.direction),
+        target_key(&rule.target)
+    )
+}
+
+fn normalize_rule(mut rule: ProgramRule, active_profile_id: &str, now: u64) -> ProgramRule {
+    rule.decision = normalize_decision(&rule.decision).unwrap_or_else(|_| "allow".to_string());
+    rule.protocol = normalize_protocol(&rule.protocol);
+    rule.direction = normalize_direction(&rule.direction);
+    if rule.profile_id.trim().is_empty() {
+        rule.profile_id = active_profile_id.to_string();
+    }
+    if rule.created_at_ms == 0 {
+        rule.created_at_ms = now;
+    }
+    rule.updated_at_ms = now;
+    if rule.app_name.trim().is_empty() && !rule.app_path.trim().is_empty() {
+        rule.app_name = app_name(&rule.app_path);
+    }
+    rule
+}
+
+fn protocol_matches(rule_protocol: &str, observed_protocol: &str) -> bool {
+    let rule_protocol = normalize_protocol(rule_protocol);
+    let observed_protocol = normalize_protocol(observed_protocol);
+    rule_protocol == "all" || observed_protocol == "all" || rule_protocol == observed_protocol
+}
+
+fn direction_matches(rule_direction: &str, observed_direction: &str) -> bool {
+    let rule_direction = normalize_direction(rule_direction);
+    let observed_direction = normalize_direction(observed_direction);
+    rule_direction == "both" || observed_direction == "both" || rule_direction == observed_direction
+}
+
+fn app_matches(rule: &ProgramRule, key: &str, app_id: &[u8]) -> bool {
+    (!rule.app_path.trim().is_empty() && app_key(&rule.app_path) == key)
+        || (!rule.app_id.is_empty() && rule.app_id == app_id)
+}
+
+fn ip_in_cidr(remote_ip: IpAddr, cidr: &str) -> bool {
+    let Some((base, prefix)) = cidr.split_once('/') else {
+        return false;
+    };
+    let Ok(prefix) = prefix.parse::<u32>() else {
+        return false;
+    };
+    match (remote_ip, base.parse::<IpAddr>()) {
+        (IpAddr::V4(remote), Ok(IpAddr::V4(base))) if prefix <= 32 => {
+            let remote = u32::from(remote);
+            let base = u32::from(base);
+            let mask = if prefix == 0 {
+                0
+            } else {
+                u32::MAX << (32 - prefix)
+            };
+            remote & mask == base & mask
+        }
+        (IpAddr::V6(remote), Ok(IpAddr::V6(base))) if prefix <= 128 => {
+            let remote = u128::from(remote);
+            let base = u128::from(base);
+            let mask = if prefix == 0 {
+                0
+            } else {
+                u128::MAX << (128 - prefix)
+            };
+            remote & mask == base & mask
+        }
+        _ => false,
+    }
+}
+
+fn target_matches(
+    target: &Option<RuleTarget>,
+    remote_ip: Option<IpAddr>,
+    remote_port: u16,
+) -> bool {
+    let Some(target) = target else {
+        return true;
+    };
+    if let Some(port) = target.port {
+        if port != remote_port {
+            return false;
+        }
+    }
+    let value = target.value.trim();
+    match target.kind.to_lowercase().as_str() {
+        "any" => true,
+        "ip" => remote_ip.is_some_and(|remote_ip| remote_ip.to_string() == value),
+        "cidr" => remote_ip.is_some_and(|remote_ip| ip_in_cidr(remote_ip, value)),
+        // Offline-first: domain rules are stored now. Runtime DNS correlation is
+        // intentionally conservative until the DNS cache mapper can prove an
+        // IP/domain relationship.
+        "domain" => false,
+        _ => value.is_empty(),
+    }
+}
+
+fn rule_is_active(rule: &ProgramRule, now: u64) -> bool {
+    rule.expires_at_ms.is_none_or(|expires_at| expires_at > now)
+}
+
+fn rule_score(
+    rule: &ProgramRule,
+    active_profile_id: &str,
+    is_session_rule: bool,
+    now: u64,
+) -> Option<(u8, u8, u64)> {
+    if !rule_is_active(rule, now) {
+        return None;
+    }
+    let target_rank = if target_is_specific(&rule.target) {
+        0
+    } else {
+        1
+    };
+    let profile = if rule.profile_id.trim().is_empty() {
+        GLOBAL_PROFILE_ID
+    } else {
+        rule.profile_id.as_str()
+    };
+    let precedence = if is_session_rule || rule.expires_at_ms.is_some() {
+        1
+    } else if profile == active_profile_id && target_rank == 0 {
+        2
+    } else if profile == active_profile_id {
+        3
+    } else if profile == GLOBAL_PROFILE_ID && target_rank == 0 {
+        4
+    } else if profile == GLOBAL_PROFILE_ID {
+        5
+    } else {
+        return None;
+    };
+    Some((precedence, target_rank, rule.updated_at_ms))
+}
+
 fn find_rule_in(
     rules: &HashMap<String, ProgramRule>,
     key: &str,
     app_id: &[u8],
+    protocol: &str,
+    direction: &str,
+    remote_ip: Option<IpAddr>,
+    remote_port: u16,
+    active_profile_id: &str,
+    now: u64,
+    is_session_rule: bool,
 ) -> Option<(String, ProgramRule)> {
-    rules
-        .get(key)
-        .cloned()
-        .map(|rule| (key.to_string(), rule))
-        .or_else(|| {
-            rules
-                .iter()
-                .find(|(_, rule)| !rule.app_id.is_empty() && rule.app_id == app_id)
-                .map(|(rule_key, rule)| (rule_key.clone(), rule.clone()))
-        })
+    let mut best: Option<(String, ProgramRule, (u8, u8, u64))> = None;
+    for (rule_key, rule) in rules {
+        if !app_matches(rule, key, app_id)
+            || !protocol_matches(&rule.protocol, protocol)
+            || !direction_matches(&rule.direction, direction)
+            || !target_matches(&rule.target, remote_ip, remote_port)
+        {
+            continue;
+        }
+        let Some(score) = rule_score(rule, active_profile_id, is_session_rule, now) else {
+            continue;
+        };
+        let is_better = best.as_ref().is_none_or(|(_, _, best_score)| {
+            score.0 < best_score.0
+                || (score.0 == best_score.0 && score.1 < best_score.1)
+                || (score.0 == best_score.0 && score.1 == best_score.1 && score.2 > best_score.2)
+        });
+        if is_better {
+            best = Some((rule_key.clone(), rule.clone(), score));
+        }
+    }
+    best.map(|(rule_key, rule, _)| (rule_key, rule))
 }
 
 fn find_program_rule(shared: &Shared, key: &str, app_id: &[u8]) -> Option<(String, ProgramRule)> {
-    find_rule_in(&shared.program_rules.lock().unwrap(), key, app_id)
-        .or_else(|| find_rule_in(&shared.session_program_rules.lock().unwrap(), key, app_id))
+    find_program_rule_for(shared, key, app_id, "all", "outbound", None, 0, now_ms())
+}
+
+fn find_program_rule_for(
+    shared: &Shared,
+    key: &str,
+    app_id: &[u8],
+    protocol: &str,
+    direction: &str,
+    remote_ip: Option<IpAddr>,
+    remote_port: u16,
+    now: u64,
+) -> Option<(String, ProgramRule)> {
+    let active_profile_id = shared
+        .app_settings
+        .lock()
+        .unwrap()
+        .active_profile_id
+        .clone();
+    find_rule_in(
+        &shared.session_program_rules.lock().unwrap(),
+        key,
+        app_id,
+        protocol,
+        direction,
+        remote_ip,
+        remote_port,
+        &active_profile_id,
+        now,
+        true,
+    )
+    .or_else(|| {
+        find_rule_in(
+            &shared.program_rules.lock().unwrap(),
+            key,
+            app_id,
+            protocol,
+            direction,
+            remote_ip,
+            remote_port,
+            &active_profile_id,
+            now,
+            false,
+        )
+    })
 }
 
 fn has_pending_program(shared: &Shared, key: &str, app_id: &[u8]) -> bool {
@@ -217,13 +490,27 @@ fn remove_rules_with_app_id(rules: &mut HashMap<String, ProgramRule>, key: &str,
     let duplicates: Vec<String> = rules
         .iter()
         .filter(|(rule_key, rule)| {
-            rule_key.as_str() == key || (!rule.app_id.is_empty() && rule.app_id == app_id)
+            rule_key.as_str() == key
+                || app_matches(rule, key, app_id)
+                || (!rule.app_id.is_empty() && rule.app_id == app_id)
         })
         .map(|(rule_key, _)| rule_key.clone())
         .collect();
     for duplicate in duplicates {
         rules.remove(&duplicate);
     }
+}
+
+fn remove_rules_for_app(rules: &mut HashMap<String, ProgramRule>, key: &str) -> Vec<ProgramRule> {
+    let duplicates: Vec<String> = rules
+        .iter()
+        .filter(|(rule_key, rule)| rule_key.as_str() == key || app_key(&rule.app_path) == key)
+        .map(|(rule_key, _)| rule_key.clone())
+        .collect();
+    duplicates
+        .into_iter()
+        .filter_map(|duplicate| rules.remove(&duplicate))
+        .collect()
 }
 
 fn parse_protocol(value: &str) -> Result<AppProtocol, String> {
@@ -266,7 +553,102 @@ fn remember_known_app(shared: &Shared, raw: &RawConn) {
     );
 }
 
-fn connection_seen(raw: &RawConn, verdict: &Verdict) -> ConnectionSeen {
+fn risk_labels_for(
+    path: Option<&str>,
+    remote_port: u16,
+    has_rule: bool,
+    had_block_history: bool,
+) -> Vec<String> {
+    let mut labels = Vec::new();
+    if !has_rule {
+        labels.push("first-seen-app".to_string());
+    }
+    if had_block_history {
+        labels.push("blocked-or-quarantined-history".to_string());
+    }
+    if let Some(path) = path {
+        let lower = path.to_lowercase();
+        if lower.contains("\\temp\\")
+            || lower.contains("/temp/")
+            || lower.contains("\\appdata\\local\\temp\\")
+            || lower.contains("\\downloads\\")
+        {
+            labels.push("suspicious-path".to_string());
+        }
+        if !(lower.starts_with("c:\\program files\\")
+            || lower.starts_with("c:\\program files (x86)\\")
+            || lower.starts_with("c:\\windows\\"))
+        {
+            labels.push("unknown-publisher-offline".to_string());
+        }
+    }
+    let usual_ports = [0, 53, 80, 123, 443, 853, 1935, 3478, 5228, 8080, 8443];
+    if !usual_ports.contains(&remote_port) {
+        labels.push("unusual-port".to_string());
+    }
+    labels
+}
+
+fn state_has_rule_for_app(shared: &Shared, key: &str) -> bool {
+    shared
+        .program_rules
+        .lock()
+        .unwrap()
+        .values()
+        .any(|rule| app_key(&rule.app_path) == key)
+        || shared
+            .session_program_rules
+            .lock()
+            .unwrap()
+            .values()
+            .any(|rule| app_key(&rule.app_path) == key)
+}
+
+fn state_has_block_history_for_app(shared: &Shared, key: &str) -> bool {
+    shared
+        .program_rules
+        .lock()
+        .unwrap()
+        .values()
+        .any(|rule| app_key(&rule.app_path) == key && rule.is_blocking())
+        || shared
+            .session_program_rules
+            .lock()
+            .unwrap()
+            .values()
+            .any(|rule| app_key(&rule.app_path) == key && rule.is_blocking())
+}
+
+fn risk_labels_for_raw(shared: &Shared, raw: &RawConn) -> Vec<String> {
+    let key = raw.app_path.as_deref().map(app_key).unwrap_or_default();
+    let has_rule = raw.app_id.as_ref().is_some_and(|app_id| {
+        find_program_rule_for(
+            shared,
+            &key,
+            app_id,
+            protocol_str(raw),
+            if raw.inbound { "inbound" } else { "outbound" },
+            Some(raw.remote_ip),
+            raw.remote_port,
+            now_ms(),
+        )
+        .is_some()
+    });
+    let had_block_history = shared
+        .program_rules
+        .lock()
+        .unwrap()
+        .values()
+        .any(|rule| app_key(&rule.app_path) == key && rule.is_blocking());
+    risk_labels_for(
+        raw.app_path.as_deref(),
+        raw.remote_port,
+        has_rule,
+        had_block_history,
+    )
+}
+
+fn connection_seen(raw: &RawConn, verdict: &Verdict, risk_labels: Vec<String>) -> ConnectionSeen {
     let (verdict_name, reason) = match verdict {
         Verdict::Pass => ("allow".to_string(), None),
         Verdict::Block { reason, .. } => ("block".to_string(), Some(format!("{reason:?}"))),
@@ -292,6 +674,7 @@ fn connection_seen(raw: &RawConn, verdict: &Verdict) -> ConnectionSeen {
         verdict: verdict_name,
         reason,
         is_new_conn: raw.is_new,
+        risk_labels,
     }
 }
 
@@ -311,7 +694,7 @@ fn active_to_raw(conn: &ActiveConnection, ts_ms: u64) -> RawConn {
     }
 }
 
-fn snapshot_seen(conn: &ActiveConnection, ts_ms: u64) -> ConnectionSeen {
+fn snapshot_seen(conn: &ActiveConnection, ts_ms: u64, risk_labels: Vec<String>) -> ConnectionSeen {
     ConnectionSeen {
         id: format!(
             "snapshot-{}-{}-{}-{}-{}",
@@ -329,6 +712,7 @@ fn snapshot_seen(conn: &ActiveConnection, ts_ms: u64) -> ConnectionSeen {
         verdict: "allow".to_string(),
         reason: Some("active-snapshot".to_string()),
         is_new_conn: false,
+        risk_labels,
     }
 }
 
@@ -356,6 +740,50 @@ fn install_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+fn push_notification(
+    shared: &Arc<Shared>,
+    app: Option<&tauri::AppHandle>,
+    kind: &str,
+    title: impl Into<String>,
+    body: impl Into<String>,
+    app_path: Option<String>,
+    remote: Option<String>,
+) -> NotificationRecord {
+    let record = NotificationRecord {
+        id: format!("{}-{}", now_ms(), kind),
+        ts_ms: now_ms(),
+        kind: kind.to_string(),
+        title: title.into(),
+        body: body.into(),
+        app_path,
+        remote,
+    };
+    {
+        let mut notifications = shared.notifications.lock().unwrap();
+        notifications.push(record.clone());
+        if notifications.len() > 400 {
+            let keep_from = notifications.len() - 400;
+            *notifications = notifications.split_off(keep_from);
+        }
+    }
+    let _ = shared.save();
+    if let Some(app) = app {
+        let _ = app.emit("notification-created", record.clone());
+    }
+    record
+}
+
+fn service_status(shared: &Shared) -> serde_json::Value {
+    let backend_error = shared.backend_error.clone();
+    serde_json::json!({
+        "installed": false,
+        "running": false,
+        "mode": if backend_error.is_some() { "offline" } else { "app-only" },
+        "defaultDenyService": "design-ready",
+        "message": backend_error.unwrap_or_else(|| "Windows service is not installed yet; m0untain is enforcing app-session WFP rules while the UI is running.".to_string()),
+    })
+}
+
 fn quarantine_snapshot(shared: &Shared) -> Vec<AppQuarantine> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
@@ -363,7 +791,7 @@ fn quarantine_snapshot(shared: &Shared) -> Vec<AppQuarantine> {
     let rules = shared.program_rules.lock().unwrap();
 
     for (key, rule) in rules.iter() {
-        if rule.decision != "quarantine" {
+        if !rule.is_blocking() {
             continue;
         }
         let active = app_blocks.contains_key(key);
@@ -436,8 +864,7 @@ fn quarantine_snapshot(shared: &Shared) -> Vec<AppQuarantine> {
 
 // ---- Tauri commands -------------------------------------------------------
 
-#[tauri::command]
-fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
+fn state_snapshot(state: &Arc<Shared>) -> serde_json::Value {
     let eng = state.engine.lock().unwrap();
     let cfg = eng.config();
     let pending: Vec<ProgramPrompt> = state
@@ -451,13 +878,22 @@ fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
         .program_rules
         .lock()
         .unwrap()
-        .values()
+        .iter()
         .map(|rule| {
+            let (rule_id, rule) = rule;
             serde_json::json!({
+                "id": rule_id,
                 "appPath": rule.app_path,
                 "appName": rule.app_name,
+                "appId": rule.app_id,
                 "decision": rule.decision,
                 "protocol": rule.protocol,
+                "direction": rule.direction,
+                "target": rule.target,
+                "expiresAtMs": rule.expires_at_ms,
+                "profileId": rule.profile_id,
+                "createdAtMs": rule.created_at_ms,
+                "updatedAtMs": rule.updated_at_ms,
             })
         })
         .collect();
@@ -465,13 +901,22 @@ fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
         .session_program_rules
         .lock()
         .unwrap()
-        .values()
+        .iter()
         .map(|rule| {
+            let (rule_id, rule) = rule;
             serde_json::json!({
+                "id": rule_id,
                 "appPath": rule.app_path,
                 "appName": rule.app_name,
+                "appId": rule.app_id,
                 "decision": rule.decision,
                 "protocol": rule.protocol,
+                "direction": rule.direction,
+                "target": rule.target,
+                "expiresAtMs": rule.expires_at_ms,
+                "profileId": rule.profile_id,
+                "createdAtMs": rule.created_at_ms,
+                "updatedAtMs": rule.updated_at_ms,
                 "temporary": true,
             })
         })
@@ -482,11 +927,25 @@ fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
         "toggles": { "ddos": cfg.ddos.enabled, "scan": cfg.scan.enabled },
         "config": cfg,
         "appSettings": state.app_settings.lock().unwrap().clone(),
+        "profiles": state.profiles.lock().unwrap().clone(),
+        "activeProfileId": state.app_settings.lock().unwrap().active_profile_id.clone(),
         "programRules": rules,
         "sessionProgramRules": session_rules,
-        "appQuarantines": quarantine_snapshot(&state),
+        "appQuarantines": quarantine_snapshot(state),
         "pendingPrograms": pending,
+        "notificationHistory": state.notifications.lock().unwrap().clone(),
+        "serviceStatus": service_status(state),
     })
+}
+
+#[tauri::command]
+fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
+    state_snapshot(state.inner())
+}
+
+#[tauri::command]
+fn get_firewall_state(state: State<Arc<Shared>>) -> serde_json::Value {
+    state_snapshot(state.inner())
 }
 
 #[tauri::command]
@@ -517,11 +976,11 @@ fn decide_program(
     decision: String,
     protocol: String,
     remember: bool,
+    duration_minutes: Option<u64>,
     state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    if decision != "allow" && decision != "quarantine" {
-        return Err("decision must be allow or quarantine".to_string());
-    }
+    let decision = normalize_decision(&decision)?;
     let scope = parse_protocol(&protocol)?;
     let pending = state
         .pending_programs
@@ -533,7 +992,7 @@ fn decide_program(
     if let Some(handle) = pending.temporary_handle {
         let _ = state.fw.unblock(handle);
     }
-    if decision == "quarantine" {
+    if decision == "quarantine" || decision == "block" {
         let handle = state.fw.block_app(&pending.app_id, scope)?;
         state.app_blocks.lock().unwrap().insert(
             request_id.clone(),
@@ -547,38 +1006,73 @@ fn decide_program(
         );
     }
 
+    let now = now_ms();
+    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
+    let expires_at_ms = duration_minutes.map(|minutes| {
+        now.saturating_add(if minutes == 0 {
+            30_000
+        } else {
+            minutes.saturating_mul(60_000)
+        })
+    });
     let rule = ProgramRule {
         app_path: pending.prompt.app_path,
         app_name: pending.prompt.app_name,
         app_id: pending.app_id,
-        decision,
-        protocol,
+        decision: decision.clone(),
+        protocol: normalize_protocol(&protocol),
+        direction: pending.prompt.direction,
+        target: None,
+        expires_at_ms,
+        profile_id: active_profile_id,
+        created_at_ms: now,
+        updated_at_ms: now,
     };
-    let key = request_id;
+    let key = rule_storage_key(&rule);
+    let app_key = request_id;
     if remember {
         {
             let mut session_rules = state.session_program_rules.lock().unwrap();
-            remove_rules_with_app_id(&mut session_rules, &key, &rule.app_id);
+            remove_rules_with_app_id(&mut session_rules, &app_key, &rule.app_id);
         }
         {
             let mut rules = state.program_rules.lock().unwrap();
-            remove_rules_with_app_id(&mut rules, &key, &rule.app_id);
+            remove_rules_with_app_id(&mut rules, &app_key, &rule.app_id);
             rules.insert(key, rule);
         }
         state.save()?;
     } else {
         let mut session_rules = state.session_program_rules.lock().unwrap();
-        remove_rules_with_app_id(&mut session_rules, &key, &rule.app_id);
+        remove_rules_with_app_id(&mut session_rules, &app_key, &rule.app_id);
         session_rules.insert(key, rule);
     }
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "program-decision",
+        format!("{} {}", decision, app_name(&app_key)),
+        if let Some(minutes) = duration_minutes {
+            if minutes == 0 {
+                "Temporary one-shot decision (~30 seconds)".to_string()
+            } else {
+                format!("Timed decision for {minutes} minutes")
+            }
+        } else if remember {
+            "Remembered as a profile rule".to_string()
+        } else {
+            "Session-only rule".to_string()
+        },
+        Some(app_key),
+        None,
+    );
     Ok(())
 }
 
 #[tauri::command]
 fn remove_program_rule(app_path: String, state: State<Arc<Shared>>) -> Result<(), String> {
     let key = app_key(&app_path);
-    state.program_rules.lock().unwrap().remove(&key);
-    state.session_program_rules.lock().unwrap().remove(&key);
+    remove_rules_for_app(&mut state.program_rules.lock().unwrap(), &key);
+    remove_rules_for_app(&mut state.session_program_rules.lock().unwrap(), &key);
     if let Some(block) = state.app_blocks.lock().unwrap().remove(&key) {
         let _ = state.fw.unblock(block.handle);
     }
@@ -592,12 +1086,12 @@ fn set_program_rule_decision(
     protocol: String,
     state: State<Arc<Shared>>,
 ) -> Result<(), String> {
-    if decision != "allow" && decision != "quarantine" {
-        return Err("decision must be allow or quarantine".to_string());
-    }
+    let decision = normalize_decision(&decision)?;
     let scope = parse_protocol(&protocol)?;
     let key = app_key(&app_path);
     let known = state.known_apps.lock().unwrap().get(&key).cloned();
+    let now = now_ms();
+    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
     let (rule_key, mut rule) = if let Some(known) = known {
         if let Some((rule_key, rule)) = find_program_rule(&state, &key, &known.app_id) {
             (rule_key, rule)
@@ -610,6 +1104,12 @@ fn set_program_rule_decision(
                     app_id: known.app_id,
                     decision: "allow".to_string(),
                     protocol: "all".to_string(),
+                    direction: "outbound".to_string(),
+                    target: None,
+                    expires_at_ms: None,
+                    profile_id: active_profile_id.clone(),
+                    created_at_ms: now,
+                    updated_at_ms: now,
                 },
             )
         }
@@ -620,13 +1120,17 @@ fn set_program_rule_decision(
     };
 
     if decision == "allow" {
-        if let Some(block) = state.app_blocks.lock().unwrap().remove(&rule_key) {
+        let mut app_blocks = state.app_blocks.lock().unwrap();
+        if let Some(block) = app_blocks
+            .remove(&rule_key)
+            .or_else(|| app_blocks.remove(&key))
+        {
             let _ = state.fw.unblock(block.handle);
         }
     } else {
         let handle = state.fw.block_app(&rule.app_id, scope)?;
         if let Some(old) = state.app_blocks.lock().unwrap().insert(
-            rule_key.clone(),
+            key.clone(),
             RuntimeAppBlock {
                 handle,
                 app_path: rule.app_path.clone(),
@@ -640,7 +1144,15 @@ fn set_program_rule_decision(
     }
 
     rule.decision = decision;
-    rule.protocol = protocol;
+    rule.protocol = normalize_protocol(&protocol);
+    rule.direction = normalize_direction(&rule.direction);
+    rule.profile_id = if rule.profile_id.trim().is_empty() {
+        active_profile_id
+    } else {
+        rule.profile_id
+    };
+    rule.updated_at_ms = now;
+    let storage_key = rule_storage_key(&rule);
     {
         let mut session_rules = state.session_program_rules.lock().unwrap();
         remove_rules_with_app_id(&mut session_rules, &rule_key, &rule.app_id);
@@ -648,13 +1160,18 @@ fn set_program_rule_decision(
     {
         let mut rules = state.program_rules.lock().unwrap();
         remove_rules_with_app_id(&mut rules, &rule_key, &rule.app_id);
-        rules.insert(rule_key, rule);
+        rules.insert(storage_key, rule);
     }
     state.save()
 }
 
 #[tauri::command]
-fn block_remote_ip(ip: String, minutes: u64, state: State<Arc<Shared>>) -> Result<(), String> {
+fn block_remote_ip(
+    ip: String,
+    minutes: u64,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     let addr: IpAddr = ip.parse().map_err(|_| "invalid IP".to_string())?;
     let block_ms = minutes.max(1).saturating_mul(60_000);
     let until_ms = now_ms().saturating_add(block_ms);
@@ -668,6 +1185,15 @@ fn block_remote_ip(ip: String, minutes: u64, state: State<Arc<Shared>>) -> Resul
         let _ = state.fw.unblock(old_handle);
     }
     state.engine.lock().unwrap().block_manual(addr, until_ms);
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "ip-blocked",
+        "Remote IP blocked",
+        format!("{addr} for {} minutes", minutes.max(1)),
+        None,
+        Some(addr.to_string()),
+    );
     Ok(())
 }
 
@@ -688,7 +1214,481 @@ fn unblock_ip(ip: String, state: State<Arc<Shared>>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn set_active_profile(
+    profile_id: String,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let exists = state
+        .profiles
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|profile| profile.id == profile_id);
+    if !exists {
+        return Err("unknown profile id".to_string());
+    }
+    {
+        let mut settings = state.app_settings.lock().unwrap();
+        settings.active_profile_id = profile_id.clone();
+    }
+    state.save()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "profile-changed",
+        "Firewall profile changed",
+        format!("Active profile is now {profile_id}"),
+        None,
+        None,
+    );
+    Ok(())
+}
+
+#[tauri::command]
+fn upsert_rule(
+    rule: ProgramRule,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
+    let mut rule = normalize_rule(rule, &active_profile_id, now_ms());
+    if rule.app_id.is_empty() && !rule.app_path.trim().is_empty() {
+        if let Some(known) = state
+            .known_apps
+            .lock()
+            .unwrap()
+            .get(&app_key(&rule.app_path))
+            .cloned()
+        {
+            rule.app_id = known.app_id;
+        } else if let Some(app_id) = wfp::app_id_from_path(&rule.app_path) {
+            rule.app_id = app_id;
+        }
+    }
+    let rule_id = rule_storage_key(&rule);
+    let app_block_key = app_key(&rule.app_path);
+
+    if rule.is_blocking() && !rule.app_id.is_empty() {
+        let handle = state.fw.block_app(
+            &rule.app_id,
+            parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
+        )?;
+        if let Some(old) = state.app_blocks.lock().unwrap().insert(
+            app_block_key.clone(),
+            RuntimeAppBlock {
+                handle,
+                app_path: rule.app_path.clone(),
+                app_name: rule.app_name.clone(),
+                protocol: rule.protocol.clone(),
+                temporary: rule.expires_at_ms.is_some(),
+            },
+        ) {
+            let _ = state.fw.unblock(old.handle);
+        }
+    } else if rule.decision == "allow" {
+        if let Some(old) = state.app_blocks.lock().unwrap().remove(&app_block_key) {
+            let _ = state.fw.unblock(old.handle);
+        }
+    }
+
+    state
+        .program_rules
+        .lock()
+        .unwrap()
+        .insert(rule_id.clone(), rule.clone());
+    state.save()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "rule-upserted",
+        "Firewall rule saved",
+        format!(
+            "{} · {} · {}",
+            rule.app_name, rule.decision, rule.profile_id
+        ),
+        Some(rule.app_path),
+        rule.target.as_ref().map(|target| target.value.clone()),
+    );
+    Ok(rule_id)
+}
+
+#[tauri::command]
+fn remove_rule(
+    rule_id: String,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let removed = state
+        .program_rules
+        .lock()
+        .unwrap()
+        .remove(&rule_id)
+        .or_else(|| state.session_program_rules.lock().unwrap().remove(&rule_id));
+    if let Some(rule) = removed {
+        let key = app_key(&rule.app_path);
+        if let Some(block) = state.app_blocks.lock().unwrap().remove(&key) {
+            let _ = state.fw.unblock(block.handle);
+        }
+        state.save()?;
+        push_notification(
+            state.inner(),
+            Some(&app),
+            "rule-removed",
+            "Firewall rule removed",
+            rule.app_name,
+            Some(rule.app_path),
+            rule.target.as_ref().map(|target| target.value.clone()),
+        );
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_timed_decision(
+    app_path: String,
+    decision: String,
+    protocol: String,
+    minutes: u64,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let key = app_key(&app_path);
+    let known = state
+        .known_apps
+        .lock()
+        .unwrap()
+        .get(&key)
+        .cloned()
+        .ok_or_else(|| "program was not observed in this session yet".to_string())?;
+    let now = now_ms();
+    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
+    let rule = ProgramRule {
+        app_path: known.app_path,
+        app_name: known.app_name,
+        app_id: known.app_id,
+        decision: normalize_decision(&decision)?,
+        protocol: normalize_protocol(&protocol),
+        direction: "outbound".to_string(),
+        target: None,
+        expires_at_ms: Some(now.saturating_add(minutes.max(1).saturating_mul(60_000))),
+        profile_id: active_profile_id,
+        created_at_ms: now,
+        updated_at_ms: now,
+    };
+    let rule_id = rule_storage_key(&rule);
+    if rule.is_blocking() {
+        let handle = state.fw.block_app(
+            &rule.app_id,
+            parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
+        )?;
+        if let Some(old) = state.app_blocks.lock().unwrap().insert(
+            key,
+            RuntimeAppBlock {
+                handle,
+                app_path: rule.app_path.clone(),
+                app_name: rule.app_name.clone(),
+                protocol: rule.protocol.clone(),
+                temporary: true,
+            },
+        ) {
+            let _ = state.fw.unblock(old.handle);
+        }
+    }
+    state
+        .session_program_rules
+        .lock()
+        .unwrap()
+        .insert(rule_id.clone(), rule.clone());
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "timed-rule",
+        "Timed firewall decision",
+        format!("{} for {} minutes", rule.decision, minutes.max(1)),
+        Some(rule.app_path),
+        None,
+    );
+    Ok(rule_id)
+}
+
+fn persistent_state_from_shared(shared: &Shared) -> PersistentState {
+    PersistentState {
+        schema_version: 2,
+        settings: shared.app_settings.lock().unwrap().clone(),
+        rules: shared.program_rules.lock().unwrap().clone(),
+        profiles: shared.profiles.lock().unwrap().clone(),
+        notifications: shared.notifications.lock().unwrap().clone(),
+    }
+}
+
+#[tauri::command]
+fn export_state(state: State<Arc<Shared>>) -> Result<String, String> {
+    serde_json::to_string_pretty(&persistent_state_from_shared(state.inner()))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn import_state(
+    json: String,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let imported: PersistentState =
+        serde_json::from_str(&json).map_err(|error| format!("invalid state JSON: {error}"))?;
+    let imported = settings::normalize_state(imported);
+    {
+        *state.app_settings.lock().unwrap() = imported.settings;
+        *state.program_rules.lock().unwrap() = imported.rules;
+        *state.profiles.lock().unwrap() = imported.profiles;
+        *state.notifications.lock().unwrap() = imported.notifications;
+        state.session_program_rules.lock().unwrap().clear();
+        state.pending_programs.lock().unwrap().clear();
+    }
+    state.save()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "state-imported",
+        "Firewall state imported",
+        "Rules, profiles, settings and history were loaded from JSON",
+        None,
+        None,
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+fn kill_process_checked(pid: u32, expected_path: Option<&str>) -> Result<(), String> {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    };
+
+    let handle = unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+            false,
+            pid,
+        )
+        .map_err(|error| format!("OpenProcess failed: {error}"))?
+    };
+    let mut buf = vec![0u16; 32768];
+    let mut len = buf.len() as u32;
+    let path_result = unsafe {
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buf.as_mut_ptr()),
+            &mut len,
+        )
+    };
+    if let Some(expected_path) = expected_path.filter(|path| !path.trim().is_empty()) {
+        path_result.map_err(|error| format!("process path check failed: {error}"))?;
+        let actual_path = String::from_utf16_lossy(&buf[..len as usize]);
+        if app_key(&actual_path) != app_key(expected_path) {
+            let _ = unsafe { CloseHandle(handle) };
+            return Err("pid no longer belongs to the expected executable".to_string());
+        }
+    }
+    unsafe {
+        TerminateProcess(handle, 1).map_err(|error| format!("TerminateProcess failed: {error}"))?
+    };
+    let _ = unsafe { CloseHandle(handle) };
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn kill_process_checked(_pid: u32, _expected_path: Option<&str>) -> Result<(), String> {
+    Err("kill_process is only available on Windows".to_string())
+}
+
+#[tauri::command]
+fn kill_process(
+    pid: u32,
+    app_path: Option<String>,
+    state: State<Arc<Shared>>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    kill_process_checked(pid, app_path.as_deref())?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "process-killed",
+        "Process killed",
+        format!("PID {pid} was terminated after path verification"),
+        app_path,
+        None,
+    );
+    Ok(())
+}
+
+#[tauri::command]
+fn resolve_endpoint(ip: String) -> serde_json::Value {
+    let parsed = ip.parse::<IpAddr>().ok();
+    serde_json::json!({
+        "ip": ip,
+        "host": serde_json::Value::Null,
+        "source": "offline-first",
+        "isPrivate": parsed.is_some_and(|ip| match ip {
+            IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local(),
+            IpAddr::V6(v6) => v6.is_loopback() || v6.is_unique_local() || v6.is_unicast_link_local(),
+        }),
+        "note": "Reverse DNS cache mapping is staged; unknown endpoints remain visible as IPs.",
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rule(decision: &str, profile_id: &str, target: Option<RuleTarget>) -> ProgramRule {
+        ProgramRule {
+            app_path: "C:\\Tools\\demo.exe".to_string(),
+            app_name: "demo.exe".to_string(),
+            app_id: vec![1, 2, 3],
+            decision: decision.to_string(),
+            protocol: "tcp".to_string(),
+            direction: "outbound".to_string(),
+            target,
+            expires_at_ms: None,
+            profile_id: profile_id.to_string(),
+            created_at_ms: 1,
+            updated_at_ms: 1,
+        }
+    }
+
+    #[test]
+    fn profile_target_rule_wins_over_global_app_rule() {
+        let mut rules = HashMap::new();
+        rules.insert("global".to_string(), rule("allow", GLOBAL_PROFILE_ID, None));
+        rules.insert(
+            "target".to_string(),
+            rule(
+                "block",
+                "home",
+                Some(RuleTarget {
+                    kind: "ip".to_string(),
+                    value: "8.8.8.8".to_string(),
+                    port: Some(443),
+                }),
+            ),
+        );
+
+        let matched = find_rule_in(
+            &rules,
+            &app_key("C:\\Tools\\demo.exe"),
+            &[1, 2, 3],
+            "tcp",
+            "outbound",
+            Some("8.8.8.8".parse().unwrap()),
+            443,
+            "home",
+            10,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(matched.1.decision, "block");
+    }
+
+    #[test]
+    fn expired_timed_rule_is_ignored() {
+        let mut timed = rule("allow", "home", None);
+        timed.expires_at_ms = Some(99);
+
+        assert!(rule_score(&timed, "home", false, 100).is_none());
+        assert!(rule_score(&timed, "home", false, 98).is_some());
+    }
+
+    #[test]
+    fn calculates_offline_risk_labels() {
+        let labels = risk_labels_for(
+            Some("C:\\Users\\micro\\Downloads\\weird.exe"),
+            4444,
+            false,
+            true,
+        );
+
+        assert!(labels.contains(&"first-seen-app".to_string()));
+        assert!(labels.contains(&"suspicious-path".to_string()));
+        assert!(labels.contains(&"unusual-port".to_string()));
+        assert!(labels.contains(&"blocked-or-quarantined-history".to_string()));
+    }
+
+    #[test]
+    fn cidr_target_matching_supports_ipv4() {
+        assert!(ip_in_cidr(
+            "192.168.1.42".parse().unwrap(),
+            "192.168.1.0/24"
+        ));
+        assert!(!ip_in_cidr(
+            "192.168.2.42".parse().unwrap(),
+            "192.168.1.0/24"
+        ));
+    }
+}
+
 // ---- background workers ---------------------------------------------------
+
+fn prune_expired_rules(shared: &Arc<Shared>, app: &tauri::AppHandle, now: u64) {
+    let mut expired = Vec::new();
+    {
+        let mut rules = shared.program_rules.lock().unwrap();
+        let keys: Vec<String> = rules
+            .iter()
+            .filter(|(_, rule)| {
+                rule.expires_at_ms
+                    .is_some_and(|expires_at| now >= expires_at)
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in keys {
+            if let Some(rule) = rules.remove(&key) {
+                expired.push((key, rule, false));
+            }
+        }
+    }
+    {
+        let mut rules = shared.session_program_rules.lock().unwrap();
+        let keys: Vec<String> = rules
+            .iter()
+            .filter(|(_, rule)| {
+                rule.expires_at_ms
+                    .is_some_and(|expires_at| now >= expires_at)
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in keys {
+            if let Some(rule) = rules.remove(&key) {
+                expired.push((key, rule, true));
+            }
+        }
+    }
+    if expired.is_empty() {
+        return;
+    }
+    for (_, rule, _) in &expired {
+        let key = app_key(&rule.app_path);
+        if let Some(block) = shared.app_blocks.lock().unwrap().remove(&key) {
+            let _ = shared.fw.unblock(block.handle);
+        }
+        let _ = app.emit("rule-expired", rule.clone());
+        push_notification(
+            shared,
+            Some(app),
+            "rule-expired",
+            "Timed firewall rule expired",
+            format!("{} · {}", rule.app_name, rule.decision),
+            Some(rule.app_path.clone()),
+            rule.target.as_ref().map(|target| target.value.clone()),
+        );
+    }
+    let _ = shared.save();
+}
 
 fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) {
     if raw.inbound {
@@ -706,16 +1706,28 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
     };
     let key = app_key(path);
 
-    if let Some((rule_key, rule)) = find_program_rule(shared, &key, app_id) {
-        if rule.decision == "quarantine"
+    let protocol = protocol_str(raw);
+    let direction = if raw.inbound { "inbound" } else { "outbound" };
+    if let Some((rule_key, rule)) = find_program_rule_for(
+        shared,
+        &key,
+        app_id,
+        protocol,
+        direction,
+        Some(raw.remote_ip),
+        raw.remote_port,
+        now_ms(),
+    ) {
+        if rule.is_blocking()
             && !shared.app_blocks.lock().unwrap().contains_key(&rule_key)
+            && !shared.app_blocks.lock().unwrap().contains_key(&key)
         {
             if let Ok(handle) = shared.fw.block_app(
                 &rule.app_id,
                 parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
             ) {
                 shared.app_blocks.lock().unwrap().insert(
-                    rule_key,
+                    key.clone(),
                     RuntimeAppBlock {
                         handle,
                         app_path: rule.app_path,
@@ -728,7 +1740,17 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         }
         return;
     }
-    if !shared.app_settings.lock().unwrap().ask_new_apps
+    let settings = shared.app_settings.lock().unwrap().clone();
+    let active_profile_default_deny = shared
+        .profiles
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|profile| profile.id == settings.active_profile_id)
+        .is_some_and(|profile| profile.default_deny);
+    let should_prompt =
+        settings.ask_new_apps || settings.default_deny_enabled || active_profile_default_deny;
+    if !should_prompt
         || has_pending_program(shared, &key, app_id)
         || shared.app_blocks.lock().unwrap().contains_key(&key)
     {
@@ -743,10 +1765,11 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         app_path: path.to_string(),
         app_name: app_name(path),
         direction: "outbound".to_string(),
-        protocol: if raw.udp { "udp" } else { "tcp" }.to_string(),
+        protocol: protocol.to_string(),
         remote_ip: raw.remote_ip.to_string(),
         remote_port: raw.remote_port,
         local_port: raw.local_port,
+        pid: raw.pid,
         first_connection_may_have_passed: true,
     };
     shared.pending_programs.lock().unwrap().insert(
@@ -756,6 +1779,15 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
             app_id: app_id.clone(),
             temporary_handle,
         },
+    );
+    push_notification(
+        shared,
+        Some(app),
+        "prompt-shown",
+        "New outbound app",
+        format!("{} wants to connect to {}", app_name(path), raw.remote_ip),
+        Some(path.to_string()),
+        Some(raw.remote_ip.to_string()),
     );
     let _ = app.emit("program-connection-request", prompt);
     show_main(app);
@@ -786,7 +1818,10 @@ fn consumer(shared: Arc<Shared>, app: tauri::AppHandle, rx: std::sync::mpsc::Rec
             .lock()
             .unwrap()
             .record(ev.remote_ip, ev.ts_ms);
-        let _ = app.emit("connection-seen", connection_seen(&raw, &verdict));
+        let risk_labels = risk_labels_for_raw(&shared, &raw);
+        let seen = connection_seen(&raw, &verdict, risk_labels);
+        let _ = app.emit("traffic-sample", seen.clone());
+        let _ = app.emit("connection-seen", seen);
     }
 }
 
@@ -794,6 +1829,7 @@ fn ticker(shared: Arc<Shared>, app: tauri::AppHandle) {
     loop {
         thread::sleep(Duration::from_millis(1000));
         let now = now_ms();
+        prune_expired_rules(&shared, &app, now);
 
         {
             let mut enforced = shared.enforced.lock().unwrap();
@@ -843,7 +1879,19 @@ fn snapshotter(shared: Arc<Shared>, app: tauri::AppHandle) {
             if !raw.udp && !raw.remote_ip.is_unspecified() {
                 inspect_program(&shared, &app, &raw);
             }
-            emitted.push(snapshot_seen(&conn, now));
+            let risk_labels = risk_labels_for(
+                conn.app_path.as_deref(),
+                conn.remote_port,
+                conn.app_path.as_deref().is_some_and(|path| {
+                    let key = app_key(path);
+                    state_has_rule_for_app(&shared, &key)
+                }),
+                conn.app_path.as_deref().is_some_and(|path| {
+                    let key = app_key(path);
+                    state_has_block_history_for_app(&shared, &key)
+                }),
+            );
+            emitted.push(snapshot_seen(&conn, now, risk_labels));
         }
 
         let _ = app.emit("connection-snapshot", emitted);
@@ -906,6 +1954,8 @@ fn main() {
                 app_settings: Mutex::new(persistent.settings),
                 program_rules: Mutex::new(persistent.rules),
                 session_program_rules: Mutex::new(HashMap::new()),
+                profiles: Mutex::new(persistent.profiles),
+                notifications: Mutex::new(persistent.notifications),
                 pending_programs: Mutex::new(HashMap::new()),
                 app_blocks: Mutex::new(HashMap::new()),
                 known_apps: Mutex::new(HashMap::new()),
@@ -914,13 +1964,18 @@ fn main() {
 
             // Restore remembered quarantine rules before consuming new events.
             for (key, rule) in shared.program_rules.lock().unwrap().clone() {
-                if rule.decision == "quarantine" {
+                if rule.is_blocking() {
+                    let block_key = if rule.app_path.trim().is_empty() {
+                        key
+                    } else {
+                        app_key(&rule.app_path)
+                    };
                     if let Ok(handle) = shared.fw.block_app(
                         &rule.app_id,
                         parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
                     ) {
                         shared.app_blocks.lock().unwrap().insert(
-                            key,
+                            block_key,
                             RuntimeAppBlock {
                                 handle,
                                 app_path: rule.app_path,
@@ -935,6 +1990,7 @@ fn main() {
 
             app.manage(shared.clone());
             install_tray(app)?;
+            let _ = app.emit("service-status", service_status(&shared));
 
             {
                 let shared = shared.clone();
@@ -961,6 +2017,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_state,
+            get_firewall_state,
             set_protection,
             set_config,
             set_app_settings,
@@ -969,7 +2026,15 @@ fn main() {
             set_program_rule_decision,
             block_remote_ip,
             whitelist_add,
-            unblock_ip
+            unblock_ip,
+            set_active_profile,
+            upsert_rule,
+            remove_rule,
+            set_timed_decision,
+            export_state,
+            import_state,
+            kill_process,
+            resolve_endpoint
         ])
         .run(tauri::generate_context!())
         .expect("error while running m0untain");

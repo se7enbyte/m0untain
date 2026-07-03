@@ -116,6 +116,8 @@
   .nav-tab{border:0;background:transparent;color:var(--ink-dim);font:700 10px var(--mono);letter-spacing:1px;text-transform:uppercase;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s ease}
   .nav-tab:hover{color:var(--ink-mid);background:#101722}
   .nav-tab.active{color:#09110b;background:var(--inbound);box-shadow:0 0 18px rgba(170,217,76,.26)}
+  .profile-select{height:34px;max-width:170px;background:#0d121a;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:0 12px;font:700 10px var(--mono);letter-spacing:.7px;text-transform:uppercase;outline:0}
+  .profile-select:hover,.profile-select:focus{border-color:#33404f;box-shadow:0 0 0 2px rgba(230,180,80,.08)}
   .view{height:calc(100vh - 62px);display:none}
   .view.active{display:block}
 
@@ -241,6 +243,9 @@
   .conn-spark{height:48px;min-width:0;align-self:center;position:relative}
   .conn-spark canvas{display:block;width:100%;height:48px}
   .conn-main{min-height:0;display:grid;grid-template-columns:2fr 1fr;gap:10px}
+  .filterbar{display:grid;grid-template-columns:1.4fr repeat(4,minmax(90px,.7fr));gap:7px;margin:-1px 0 9px}
+  .filterbar input,.filterbar select{min-width:0;background:#080c12;border:1px solid var(--line-soft);border-radius:9px;color:var(--ink);padding:8px 9px;font:10px var(--mono);outline:0}
+  .filterbar input:focus,.filterbar select:focus{border-color:rgba(230,180,80,.42)}
   .conn-list{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
   .conn-row{display:grid;grid-template-columns:1.05fr .8fr .7fr auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line-soft);border-radius:10px;background:#090d13}
   .conn-row.block{border-color:rgba(240,113,120,.38);background:rgba(240,113,120,.055)}
@@ -266,6 +271,7 @@
   .tree-toggle{width:24px;height:24px;border:1px solid var(--line);border-radius:8px;background:#0e141d;color:var(--ink-mid);display:grid;place-items:center;font:700 12px var(--mono);transition:transform .18s ease,border-color .18s ease,color .18s ease}
   .tree-app.open .tree-toggle{transform:rotate(90deg);border-color:rgba(230,180,80,.35);color:var(--accent)}
   .tree-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:rgba(89,194,255,.08);border:1px solid rgba(89,194,255,.18);color:var(--outbound);font:800 10px var(--mono);letter-spacing:.2px}
+  .tree-icon img,.detail-icon img,.app-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
   .tree-app.allowed .tree-icon{background:rgba(170,217,76,.10);border-color:rgba(170,217,76,.20);color:var(--inbound)}
   .tree-app.blocked .tree-icon{background:rgba(240,113,120,.11);border-color:rgba(240,113,120,.22);color:var(--block)}
   .tree-app.pending .tree-icon{background:rgba(255,180,84,.11);border-color:rgba(255,180,84,.24);color:var(--scan)}
@@ -284,7 +290,14 @@
   .detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.detail-stat{padding:8px;border:1px solid var(--line-soft);border-radius:9px;background:#080c12}.detail-stat small{display:block;color:var(--ink-dim);font:8.5px var(--mono);letter-spacing:.8px;text-transform:uppercase}.detail-stat b{display:block;color:var(--ink);font:13px var(--mono);margin-top:5px}
   .detail-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
   .detail-section{border:1px solid var(--line-soft);border-radius:10px;background:#090d13;padding:9px}.detail-section h4{margin:0 0 7px;font:10px var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--ink-dim)}
-  .detail-endpoint{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line-soft);font:10px var(--mono);color:var(--ink-mid)}.detail-endpoint:first-of-type{border-top:0}.detail-endpoint span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-endpoint b{color:var(--ink)}
+  .detail-endpoint{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line-soft);font:10px var(--mono);color:var(--ink-mid)}.detail-endpoint:first-of-type{border-top:0}.detail-endpoint span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-endpoint b{color:var(--ink)}
+  .notif-page{height:100%;padding:12px 18px 18px;overflow:hidden}
+  .notif-grid{height:100%;display:grid;grid-template-columns:1fr 2fr;gap:10px;min-height:0}
+  .history-list{overflow:auto;display:flex;flex-direction:column;gap:8px;min-height:0}
+  .history-row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line-soft);border-radius:10px;background:#090d13}
+  .history-row b{display:block;font-size:12px;color:var(--ink)}.history-row small{display:block;margin-top:3px;font:9.5px/1.35 var(--mono);color:var(--ink-dim);overflow-wrap:anywhere}
+  .history-kind{font:700 9px var(--mono);letter-spacing:.8px;text-transform:uppercase;color:var(--accent)}
+  .history-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.history-stat{border:1px solid var(--line-soft);border-radius:11px;background:#090d13;padding:12px}.history-stat small{font:9px var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--ink-dim)}.history-stat b{display:block;margin-top:8px;font:700 24px var(--mono);color:var(--ink)}
 
   .solo{padding:16px 22px}
   .solo .panel{min-height:calc(100vh - 32px)}
@@ -300,7 +313,7 @@
   .remember{display:flex;align-items:center;gap:8px;color:var(--ink-mid);font-size:12px;margin:12px 0}.remember input{accent-color:var(--accent)}
   .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.btn{border:1px solid var(--line);border-radius:9px;padding:10px 15px;background:#111722;color:var(--ink);cursor:pointer;font:600 12px var(--ui)}.btn:hover{border-color:#3a4655}.btn.allow{background:rgba(170,217,76,.12);border-color:rgba(170,217,76,.45);color:var(--inbound)}.btn.block{background:rgba(240,113,120,.12);border-color:rgba(240,113,120,.5);color:var(--block)}
   .setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 2px;border-bottom:1px solid var(--line-soft)}.setting-row b{font-size:13px}.setting-row small{display:block;color:var(--ink-dim);font:10.5px/1.45 var(--mono);margin-top:4px}.setting-row input{width:18px;height:18px;accent-color:var(--accent)}
-  .rules-title{font:10px var(--mono);letter-spacing:1.3px;text-transform:uppercase;color:var(--ink-dim);margin:22px 0 9px}.rule-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px;border:1px solid var(--line-soft);border-radius:9px;margin-top:7px;background:#090d13}.rule-row b{font-size:12px}.rule-row small{display:block;color:var(--ink-dim);font:9.5px var(--mono);margin-top:2px;overflow-wrap:anywhere}.rule-status{font:10px var(--mono);text-transform:uppercase}.rule-status.allow{color:var(--inbound)}.rule-status.quarantine{color:var(--block)}.rule-remove{background:transparent;border:0;color:var(--ink-dim);cursor:pointer;font-size:17px}.rule-remove:hover{color:var(--block)}
+  .rules-title{font:10px var(--mono);letter-spacing:1.3px;text-transform:uppercase;color:var(--ink-dim);margin:22px 0 9px}.rule-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px;border:1px solid var(--line-soft);border-radius:9px;margin-top:7px;background:#090d13}.rule-row b{font-size:12px}.rule-row small{display:block;color:var(--ink-dim);font:9.5px var(--mono);margin-top:2px;overflow-wrap:anywhere}.rule-status{font:10px var(--mono);text-transform:uppercase}.rule-status.allow{color:var(--inbound)}.rule-status.quarantine,.rule-status.block{color:var(--block)}.rule-remove{background:transparent;border:0;color:var(--ink-dim);cursor:pointer;font-size:17px}.rule-remove:hover{color:var(--block)}
 </style>
 </head>
 <body>
@@ -313,7 +326,9 @@
   <div class="nav-tabs" role="tablist" aria-label="m0untain sections">
     <button class="nav-tab active" data-view-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
     <button class="nav-tab" data-view-tab="connections" role="tab" aria-selected="false">Connections</button>
+    <button class="nav-tab" data-view-tab="notifications" role="tab" aria-selected="false">History</button>
   </div>
+  <select class="profile-select" id="profile-select" title="Active firewall profile"></select>
   <div class="top-stats">
     <div class="tstat"><b id="t-eps" style="color:var(--inbound)">0</b><span>events / s</span></div>
     <div class="tstat"><b id="t-blk" style="color:var(--block)">0</b><span>blocked / s</span></div>
@@ -342,6 +357,13 @@
     <div class="conn-main">
       <div class="panel" data-static-panel="connections">
         <div class="p-head"><div class="p-title"><span class="ey">live flow log</span>All Connections</div></div>
+        <div class="filterbar">
+          <input id="conn-search" placeholder="Search app, path, endpoint..." autocomplete="off">
+          <select id="conn-status-filter"><option value="all">All status</option><option value="pending">Pending</option><option value="blocked">Blocked</option><option value="allowed">Allowed</option><option value="observed">Observed</option></select>
+          <select id="conn-profile-filter"><option value="all">All profiles</option></select>
+          <select id="conn-proto-filter"><option value="all">All protocol</option><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+          <select id="conn-dir-filter"><option value="all">All direction</option><option value="outbound">Outbound</option><option value="inbound">Inbound</option></select>
+        </div>
         <div class="conn-list" id="connection-list"></div>
       </div>
       <div class="conn-side">
@@ -358,6 +380,27 @@
   </div>
 </div>
 
+<div class="view" id="notifications-view">
+  <div class="notif-page">
+    <div class="notif-grid">
+      <div class="panel">
+        <div class="p-head"><div class="p-title"><span class="ey">notification history</span>Event Summary</div></div>
+        <div class="history-stats">
+          <div class="history-stat"><small>events</small><b id="hist-total">0</b></div>
+          <div class="history-stat"><small>prompts</small><b id="hist-prompts">0</b></div>
+          <div class="history-stat"><small>rules</small><b id="hist-rules">0</b></div>
+          <div class="history-stat"><small>blocks</small><b id="hist-blocks">0</b></div>
+        </div>
+        <div class="backend-note show" id="service-note" style="display:block;margin-top:12px"></div>
+      </div>
+      <div class="panel">
+        <div class="p-head"><div class="p-title"><span class="ey">audit trail</span>Prompts, Decisions, Expiry</div></div>
+        <div class="history-list" id="notification-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="focus-scrim" id="focus-scrim"></div>
 
 <div class="overlay" id="program-overlay" role="dialog" aria-modal="true" aria-labelledby="program-title">
@@ -367,8 +410,9 @@
     <div class="connection-grid"><div class="conn-cell"><small>Yön</small><b id="prompt-direction"></b></div><div class="conn-cell"><small>Protokol</small><b id="prompt-protocol"></b></div><div class="conn-cell"><small>Hedef</small><b id="prompt-target"></b></div></div>
     <div class="warning-note" id="first-packet-note">İlk bağlantı olayı WFP tarafından sınıflandırıldıktan sonra görüldü; ilk paket geçmiş olabilir. Sonraki bağlantılar karar verilene kadar karantinada.</div>
     <div class="field"><label for="prompt-scope">Kararın uygulanacağı bağlantı tipi</label><select id="prompt-scope" data-testid="connection-scope"><option value="all">TCP + UDP (tümü)</option><option value="tcp">Yalnız TCP</option><option value="udp">Yalnız UDP</option></select></div>
+    <div class="field"><label for="prompt-duration">Karar süresi</label><select id="prompt-duration"><option value="remember">Remember / kalıcı profil kuralı</option><option value="once">Allow once (~30 sn)</option><option value="10">10 dakika</option><option value="60">1 saat</option><option value="session">Sadece bu oturum</option></select></div>
     <label class="remember"><input type="checkbox" id="prompt-remember" checked> Bu kararı hatırla</label>
-    <div class="actions"><button class="btn block" id="quarantine-btn" data-testid="quarantine-button">Karantinada tut</button><button class="btn allow" id="allow-btn" data-testid="allow-button">Bağlantıya izin ver</button></div>
+    <div class="actions"><button class="btn block" id="kill-prompt-btn">Kill process</button><button class="btn block" id="quarantine-btn" data-testid="quarantine-button">Karantinada tut</button><button class="btn allow" id="allow-btn" data-testid="allow-button">Bağlantıya izin ver</button></div>
   </div>
 </div>
 
@@ -378,6 +422,7 @@
     <div class="setting-row"><div><b>Windows başlangıcında çalıştır</b><small>Kullanıcı oturum açınca arka planda, tray ikonuyla başlar.</small></div><input type="checkbox" id="setting-startup"></div>
     <div class="setting-row"><div><b>Kapatınca tray’de açık kal</b><small>Pencerenin X düğmesi korumayı durdurmaz; dağ ikonundan tekrar açılır.</small></div><input type="checkbox" id="setting-tray"></div>
     <div class="setting-row"><div><b>Yeni uygulamalarda bağlantı kararı sor</b><small>Bilinmeyen uygulama m0untain açık kaldığı sürece karantinaya alınır ve TCP/UDP kapsamı sorulur.</small></div><input type="checkbox" id="setting-ask"></div>
+    <div class="setting-row"><div><b>Import / export firewall state</b><small>Rules, profiles, settings ve history JSON olarak alınabilir veya geri yüklenebilir.</small></div><div class="qactions"><button class="tinybtn" id="state-export">Export JSON</button><button class="tinybtn allow" id="state-import">Import JSON</button></div></div>
     <div class="rules-title">Hatırlanan uygulama kararları</div><div id="program-rules"></div>
     <div class="actions"><button class="btn" id="settings-cancel">Vazgeç</button><button class="btn allow" id="settings-save" data-testid="settings-save">Ayarları kaydet</button></div>
   </div>
@@ -507,7 +552,9 @@ const state = {
     ddos:{enabled:true,window_ms:1000,max_conns_per_window:40,block_ms:60000,global_max_conns_per_window:0},
     scan:{enabled:true,window_ms:3000,distinct_ports_threshold:15,block_ms:300000},
   },
-  appSettings:{launchOnStartup:false,closeToTray:true,askNewApps:true},
+  appSettings:{launchOnStartup:false,closeToTray:true,askNewApps:true,activeProfileId:'home',defaultDenyEnabled:false},
+  profiles:[], activeProfileId:'home', notificationHistory:[], serviceStatus:null,
+  connectionFilters:{search:'',status:'all',profile:'all',protocol:'all',direction:'all'},
   programRules:[], sessionProgramRules:[], appQuarantines:[], promptQueue:[], activePrompt:null,
   connections:[], connectionSnapshot:[], connectionBlocked:0, connectionSeenTotal:0, connectionPulse:0,
 };
@@ -783,7 +830,52 @@ function refreshBackendStatus(){
     note.classList.toggle('show',offline);
     note.textContent=offline?`Firewall backend could not start: ${state.backendError}. Run m0untain as administrator for real WFP enforcement.`:'';
   }
+  const service=document.getElementById('service-note');
+  if(service){
+    const status=state.serviceStatus||{};
+    service.textContent=status.message||'Windows service design is staged; current enforcement is app-only while m0untain is running.';
+  }
 }
+function syncProfileSelectors(){
+  const profiles=state.profiles?.length?state.profiles:[
+    {id:'home',name:'Home'},{id:'public-wifi',name:'Public Wi-Fi'},{id:'gaming',name:'Gaming'},{id:'work',name:'Work'},{id:'lockdown',name:'Lockdown'}
+  ];
+  const active=state.activeProfileId||state.appSettings.activeProfileId||'home';
+  const fill=(el,includeAll=false)=>{
+    if(!el)return;
+    const current=el.value||active;
+    el.innerHTML=(includeAll?'<option value="all">All profiles</option>':'')+profiles.map(p=>`<option value="${esc(p.id)}">${esc(p.name||p.id)}</option>`).join('');
+    el.value=includeAll?state.connectionFilters.profile||'all':active;
+    if(!includeAll&&!profiles.some(p=>p.id===el.value))el.value=current;
+  };
+  fill(document.getElementById('profile-select'),false);
+  fill(document.getElementById('conn-profile-filter'),true);
+}
+function pushHistory(record){
+  if(!record)return;
+  state.notificationHistory=[record,...state.notificationHistory.filter(x=>x.id!==record.id)].slice(0,400);
+  paintNotifications();
+}
+function paintNotifications(){
+  const rows=state.notificationHistory||[];
+  const byKind=k=>rows.filter(r=>String(r.kind||'').includes(k)).length;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('hist-total',rows.length);
+  set('hist-prompts',byKind('prompt'));
+  set('hist-rules',byKind('rule'));
+  set('hist-blocks',rows.filter(r=>/block|quarantine|kill/i.test(String(r.kind)+' '+String(r.title))).length);
+  const root=document.getElementById('notification-list');if(!root)return;
+  root.innerHTML=rows.length?rows.slice(0,120).map(r=>{
+    const ts=new Date(r.tsMs||r.ts_ms||Date.now()).toLocaleString('tr-TR');
+    const body=[r.body,r.appPath,r.remote].filter(Boolean).join(' · ');
+    return `<div class="history-row"><span class="history-kind">${esc(r.kind||'event')}</span><div><b>${esc(r.title||'m0untain event')}</b><small>${esc(body||'—')}</small></div><small>${esc(ts)}</small></div>`;
+  }).join(''):'<div class="empty">Henüz notification history yok.</div>';
+}
+document.getElementById('profile-select')?.addEventListener('change',async e=>{
+  state.activeProfileId=e.target.value;state.appSettings.activeProfileId=e.target.value;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_active_profile',{profileId:e.target.value}).catch(console.error);
+  syncProfileSelectors();paintConnections();
+});
 async function applyConfig(){
   const num=(id,fallback)=>Math.max(1,parseInt(document.getElementById(id)?.value||fallback,10)||fallback);
   state.config.ddos.enabled=!!state.toggles.ddos;
@@ -864,7 +956,12 @@ async function handleQuarantineAction(button){
 }
 function paintRules(){
   const root=document.getElementById('program-rules');
-  root.innerHTML=state.programRules.length?state.programRules.map(r=>`<div class="rule-row"><div><b>${esc(r.appName)}</b><small>${esc(r.appPath)}</small></div><span class="rule-status ${esc(r.decision)}">${r.decision==='allow'?'izinli':'karantina'} · ${esc(r.protocol)}</span><button class="rule-remove" data-rule-path="${esc(r.appPath)}" title="Kararı sil">×</button></div>`).join(''):'<div class="empty">Henüz hatırlanan uygulama kararı yok.</div>';
+  root.innerHTML=state.programRules.length?state.programRules.map(r=>{
+    const target=r.target?.value?` · ${esc(r.target.value)}${r.target.port?':'+esc(r.target.port):''}`:'';
+    const expiry=r.expiresAtMs?` · expires ${new Date(r.expiresAtMs).toLocaleTimeString('tr-TR')}`:'';
+    const label=r.decision==='allow'?'izinli':(r.decision==='block'?'block':'karantina');
+    return `<div class="rule-row"><div><b>${esc(r.appName)}</b><small>${esc(r.appPath)} · ${esc(r.profileId||'global')}${target}${expiry}</small></div><span class="rule-status ${esc(r.decision)}">${label} · ${esc(r.direction||'outbound')} · ${esc(r.protocol)}</span><button class="rule-remove" data-rule-path="${esc(r.appPath)}" title="Kararı sil">×</button></div>`;
+  }).join(''):'<div class="empty">Henüz hatırlanan uygulama kararı yok.</div>';
 }
 function openSettings(){
   document.getElementById('setting-startup').checked=!!state.appSettings.launchOnStartup;
@@ -874,7 +971,7 @@ function openSettings(){
 }
 function closeSettings(){document.getElementById('settings-overlay').classList.remove('show');}
 async function saveSettings(){
-  const settings={launchOnStartup:document.getElementById('setting-startup').checked,closeToTray:document.getElementById('setting-tray').checked,askNewApps:document.getElementById('setting-ask').checked};
+  const settings={...state.appSettings,launchOnStartup:document.getElementById('setting-startup').checked,closeToTray:document.getElementById('setting-tray').checked,askNewApps:document.getElementById('setting-ask').checked,activeProfileId:state.activeProfileId||state.appSettings.activeProfileId||'home'};
   if(hasTauriApi)await window.__TAURI__.core.invoke('set_app_settings',{settings});
   state.appSettings=settings;refreshSettingSwitches();closeSettings();
 }
@@ -892,14 +989,18 @@ function showNextProgram(){
   document.getElementById('prompt-protocol').textContent=String(p.protocol||'').toUpperCase();
   document.getElementById('prompt-target').textContent=`${p.remoteIp}:${p.remotePort}`;
   document.getElementById('prompt-scope').value='all';document.getElementById('prompt-remember').checked=true;
+  document.getElementById('prompt-duration').value='remember';
   document.getElementById('first-packet-note').style.display=p.firstConnectionMayHavePassed?'block':'none';
   document.getElementById('program-overlay').classList.add('show');updateNotice();paintQuarantine();paintConnections();
 }
 async function decideProgram(decision){
   const p=state.activePrompt;if(!p)return;
-  const protocol=document.getElementById('prompt-scope').value,remember=document.getElementById('prompt-remember').checked;
-  if(hasTauriApi)await window.__TAURI__.core.invoke('decide_program',{requestId:p.id,decision,protocol,remember});
-  const localRule={appPath:p.appPath,appName:p.appName,decision,protocol,temporary:!remember};
+  const protocol=document.getElementById('prompt-scope').value,duration=document.getElementById('prompt-duration').value;
+  const remember=duration==='remember'&&document.getElementById('prompt-remember').checked;
+  const durationMinutes=duration==='once'?0:(duration==='10'?10:(duration==='60'?60:null));
+  if(hasTauriApi)await window.__TAURI__.core.invoke('decide_program',{requestId:p.id,decision,protocol,remember,durationMinutes});
+  const expiresAtMs=durationMinutes==null?null:Date.now()+(durationMinutes===0?30000:durationMinutes*60000);
+  const localRule={appPath:p.appPath,appName:p.appName,decision,protocol,temporary:!remember,profileId:state.activeProfileId,expiresAtMs};
   state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
   state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
   if(remember)state.programRules=state.programRules.concat([localRule]);
@@ -913,8 +1014,29 @@ document.getElementById('settings-btn').addEventListener('click',openSettings);
 document.getElementById('settings-close').addEventListener('click',closeSettings);
 document.getElementById('settings-cancel').addEventListener('click',closeSettings);
 document.getElementById('settings-save').addEventListener('click',()=>saveSettings().catch(console.error));
+document.getElementById('state-export').addEventListener('click',async()=>{
+  const json=hasTauriApi?await window.__TAURI__.core.invoke('export_state'):JSON.stringify({settings:state.appSettings,rules:state.programRules,profiles:state.profiles,notifications:state.notificationHistory},null,2);
+  await navigator.clipboard?.writeText(json).catch(()=>{});
+  const blob=new Blob([json],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='m0untain-state-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+document.getElementById('state-import').addEventListener('click',async()=>{
+  const json=prompt('Paste m0untain state JSON');if(!json)return;
+  if(hasTauriApi){await window.__TAURI__.core.invoke('import_state',{json});const s=await window.__TAURI__.core.invoke('get_firewall_state');applyBackendState(s);}
+});
 document.getElementById('allow-btn').addEventListener('click',()=>decideProgram('allow').catch(console.error));
 document.getElementById('quarantine-btn').addEventListener('click',()=>decideProgram('quarantine').catch(console.error));
+document.getElementById('kill-prompt-btn').addEventListener('click',async()=>{
+  const p=state.activePrompt;if(!p)return;
+  if(hasTauriApi&&p.pid!=null){
+    await window.__TAURI__.core.invoke('decide_program',{requestId:p.id,decision:'quarantine',protocol:'all',remember:false,durationMinutes:null}).catch(console.error);
+    await window.__TAURI__.core.invoke('kill_process',{pid:p.pid,appPath:p.appPath}).catch(console.error);
+  }
+  state.activePrompt=null;document.getElementById('program-overlay').classList.remove('show');updateNotice();paintQuarantine();paintConnections();showNextProgram();
+});
+document.getElementById('prompt-duration').addEventListener('change',e=>{
+  document.getElementById('prompt-remember').checked=e.target.value==='remember';
+});
 document.getElementById('program-rules').addEventListener('click',async e=>{const button=e.target.closest('[data-rule-path]');if(!button)return;const path=button.dataset.rulePath;if(hasTauriApi)await window.__TAURI__.core.invoke('remove_program_rule',{appPath:path});state.programRules=state.programRules.filter(r=>r.appPath!==path);state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path));state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));paintRules();paintQuarantine();paintConnections();});
 
 // ---- block list + talkers rendering ---------------------------------------
@@ -995,11 +1117,6 @@ async function handleIpAction(button){
   state.blocks=state.blocks.filter(b=>b.ip!==ip).concat([{ip,reason:'manual',ttl:3600}]);
   paintBlocks();
 }
-document.getElementById('connections-view').addEventListener('click',e=>{
-  const conn=e.target.closest('[data-conn-action]');if(conn){handleConnectionAction(conn).catch(console.error);return;}
-  const ip=e.target.closest('[data-ip-action]');if(ip){handleIpAction(ip).catch(console.error);}
-});
-
 // ---- network tree + selected process control ------------------------------
 function connTs(c){return c.tsMs??c.ts_ms??Date.now();}
 function connRemote(c){return c.remoteIp??c.remote_ip??'?';}
@@ -1007,6 +1124,10 @@ function connRemotePort(c){return c.remotePort??c.remote_port??'?';}
 function connLocalPort(c){return c.localPort??c.local_port??'?';}
 function appInitials(name){
   return String(name||'?').replace(/\.[^.]+$/,'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'?';
+}
+function iconHtml(app,cls='tree-icon'){
+  const src=app?.iconDataUrl||app?.appIcon||app?.icon;
+  return `<div class="${cls}">${src?`<img src="${esc(src)}" alt="">`:esc(appInitials(app?.name||app?.appName))}</div>`;
 }
 function normalizeConnection(conn){
   const appPath=conn.appPath??conn.app_path??'';
@@ -1023,6 +1144,8 @@ function normalizeConnection(conn){
     remotePort:connRemotePort(conn),
     localPort:connLocalPort(conn),
     verdict:String(conn.verdict??'allow').toLowerCase(),
+    riskLabels:conn.riskLabels||conn.risk_labels||[],
+    iconDataUrl:conn.iconDataUrl||conn.icon_data_url||null,
   };
 }
 function appIdentity(conn){
@@ -1046,12 +1169,14 @@ function connectionGroups(){
     const id=appIdentity(c);
     let g=groups.get(id.key);
     if(!g){
-      g={...id,count:0,blocked:0,allowed:0,lastTs:0,last:c,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map()};
+      g={...id,count:0,blocked:0,allowed:0,lastTs:0,last:c,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map(),riskLabels:new Set(),iconDataUrl:c.iconDataUrl||null};
       groups.set(id.key,g);
     }
     g.count++; if(c.verdict==='block')g.blocked++; else g.allowed++;
     g.lastTs=Math.max(g.lastTs,connTs(c)); if(connTs(c)>=connTs(g.last))g.last=c;
     g.connections.push(c);
+    (c.riskLabels||[]).forEach(label=>g.riskLabels.add(label));
+    if(!g.iconDataUrl&&c.iconDataUrl)g.iconDataUrl=c.iconDataUrl;
     bumpMap(g.protocols,protoLabel(c.protocol));
     bumpMap(g.directions,c.direction||'unknown');
     const remoteKey=`${c.remoteIp}:${c.remotePort}`;
@@ -1064,8 +1189,8 @@ function connectionGroups(){
 function topMapLabel(map,limit=2){
   return [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([k,v])=>`${k} ${v}`).join(' · ')||'—';
 }
-function emptyAppGroup({key,name,sub,appPath='',pid='?'}) {
-  return {key,name,sub,appPath,pid,count:0,blocked:0,allowed:0,lastTs:0,last:null,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map(),observedCount:0,rule:null,quarantine:null,pending:null,status:'observed'};
+function emptyAppGroup({key,name,sub,appPath='',pid='?',iconDataUrl=null}) {
+  return {key,name,sub,appPath,pid,iconDataUrl,count:0,blocked:0,allowed:0,lastTs:0,last:null,connections:[],remotes:new Map(),protocols:new Map(),directions:new Map(),riskLabels:new Set(),observedCount:0,rule:null,quarantine:null,pending:null,status:'observed'};
 }
 function ensureInventoryGroup(map, app){
   let g=map.get(app.key);
@@ -1112,6 +1237,16 @@ function applicationGroups(){
     const rank={pending:0,blocked:1,allowed:2,observed:3};
     return (rank[a.status]-rank[b.status])||(b.lastTs-a.lastTs)||String(a.name).localeCompare(String(b.name),'tr');
   });
+}
+function groupMatchesFilters(g){
+  const f=state.connectionFilters||{};
+  const hay=[g.name,g.sub,g.appPath,[...g.remotes.values()].map(r=>`${r.ip}:${r.port}`).join(' ')].join(' ').toLowerCase();
+  if(f.search&& !hay.includes(String(f.search).toLowerCase()))return false;
+  if(f.status&&f.status!=='all'&&g.status!==f.status)return false;
+  if(f.profile&&f.profile!=='all'&&g.rule?.profileId!==f.profile)return false;
+  if(f.protocol&&f.protocol!=='all'&&!g.connections.some(c=>String(c.protocol).toLowerCase()===f.protocol))return false;
+  if(f.direction&&f.direction!=='all'&&!g.connections.some(c=>String(c.direction).toLowerCase()===f.direction))return false;
+  return true;
 }
 function sectionedApps(groups){
   const sections=[
@@ -1187,13 +1322,15 @@ function renderAppGroup(g){
   const latest=g.lastTs?new Date(g.lastTs).toLocaleTimeString('tr-TR'):'not observed this session';
   const children=open?g.connections.slice(0,18).map(renderConnectionChild).join('')+(g.connections.length>18?`<div class="tree-empty">+${g.connections.length-18} older connection hidden in this view</div>`:''):'';
   const canDecide=hasApp&&g.status!=='pending';
+  const risks=[...(g.riskLabels||[])].slice(0,2).map(label=>`<span class="pill wait">${esc(label)}</span>`).join('');
   return `<div class="tree-app ${open?'open':''} ${selected?'selected':''} ${g.blocked?'has-block':''} ${esc(g.status)}" data-app-key="${esc(g.key)}">
     <div class="tree-head">
       <button class="tree-toggle" data-tree-toggle="${esc(g.key)}" title="Bağlantıları aç/kapat">›</button>
-      <div class="tree-icon">${esc(appInitials(g.name))}</div>
+      ${iconHtml(g,'tree-icon')}
       <div class="tree-name"><b>${esc(g.name)}</b><small>${esc(g.sub)} · last ${latest}</small></div>
       <div class="tree-kpis">
         ${statusPill(g)}
+        ${risks}
         <span class="pill">${g.observedCount||g.count||0} flow</span>
         ${g.blocked?`<span class="pill hot">${g.blocked} block</span>`:`<span class="pill">${g.allowed} allow</span>`}
         <span class="pill">${g.remotes.size} endpoint</span>
@@ -1211,8 +1348,9 @@ function paintAppDetail(groups){
   const g=groups.find(x=>x.key===runtime.selectedAppKey)||groups[0];
   const hasApp=!!g.appPath,canDecide=hasApp&&g.status!=='pending',latest=g.last||{},canBlockLatest=isBlockableIp(latest.remoteIp);
   const endpoints=[...g.remotes.values()].sort((a,b)=>b.count-a.count);
+  const risks=[...(g.riskLabels||[])].map(label=>`<span class="pill wait">${esc(label)}</span>`).join('')||'<span class="pill">offline reputation clean/unknown</span>';
   root.innerHTML=`<div class="detail-hero">
-    <div class="detail-icon">${esc(appInitials(g.name))}</div>
+    ${iconHtml(g,'detail-icon')}
     <div class="detail-title"><b>${esc(g.name)}</b><small>${esc(g.sub)}</small></div>
   </div>
   <div class="detail-grid">
@@ -1223,22 +1361,26 @@ function paintAppDetail(groups){
   <div class="detail-actions">
     <button class="tinybtn danger" data-conn-action="quarantine" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>Karantinaya al</button>
     <button class="tinybtn allow" data-conn-action="allow" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>İzin ver</button>
+    <button class="tinybtn allow" data-timed-allow="10" data-app-path="${esc(g.appPath||'')}" ${canDecide?'':'disabled'}>10 dk izin</button>
+    <button class="tinybtn danger" data-kill-process data-pid="${esc(g.pid||latest.pid||'')}" data-app-path="${esc(g.appPath||'')}" ${hasApp?'':'disabled'}>Kill process</button>
     <button class="tinybtn danger" data-ip-action="block" data-ip="${esc(latest.remoteIp||'')}" ${canBlockLatest?'':'disabled'}>Son IP block</button>
   </div>
+  <div class="detail-section"><h4>Risk labels</h4><div class="qmeta">${risks}</div></div>
   <div class="detail-section"><h4>Connection mix</h4>
     <div class="mini-row"><span>Protocols</span><b>${esc(topMapLabel(g.protocols,3))}</b></div>
     <div class="mini-row"><span>Directions</span><b>${esc(topMapLabel(g.directions,3))}</b></div>
     <div class="mini-row"><span>Latest target</span><b>${esc((latest.remoteIp||'?')+':'+(latest.remotePort||'?'))}</b></div>
   </div>
   <div class="detail-section"><h4>Observed endpoints</h4>
-    ${endpoints.slice(0,10).map(r=>`<div class="detail-endpoint"><span>${esc(r.ip)}:${esc(r.port)}</span><b>${r.count}${r.blocked?` · ${r.blocked} blocked`:''}</b></div>`).join('')||'<div class="tree-empty">Endpoint yok.</div>'}
+    ${endpoints.slice(0,10).map(r=>`<div class="detail-endpoint"><span>${esc(r.ip)}:${esc(r.port)}</span><b>${r.count}${r.blocked?` · ${r.blocked} blocked`:''}</b><div class="conn-actions"><button class="tinybtn allow" data-target-action="allow" data-app-path="${esc(g.appPath||'')}" data-ip="${esc(r.ip)}" data-port="${esc(r.port)}" ${hasApp?'':'disabled'}>target allow</button><button class="tinybtn danger" data-target-action="block" data-app-path="${esc(g.appPath||'')}" data-ip="${esc(r.ip)}" data-port="${esc(r.port)}" ${hasApp?'':'disabled'}>target block</button></div></div>`).join('')||'<div class="tree-empty">Endpoint yok.</div>'}
   </div>`;
 }
 function paintConnections(){
-  const groups=applicationGroups();
+  const allGroups=applicationGroups();
+  const groups=allGroups.filter(groupMatchesFilters);
   const total=document.getElementById('conn-total'),apps=document.getElementById('conn-apps'),remotes=document.getElementById('conn-remotes'),blocked=document.getElementById('conn-blocked');
   if(total)total.textContent=state.connectionSeenTotal||state.connections.length;
-  if(apps)apps.textContent=groups.length;
+  if(apps)apps.textContent=allGroups.length;
   if(remotes)remotes.textContent=runtime.seenRemotes.size;
   if(blocked)blocked.textContent=state.connectionBlocked;
   const root=document.getElementById('connection-list');
@@ -1270,8 +1412,34 @@ async function handleIpAction(button){
   state.blocks=state.blocks.filter(b=>b.ip!==ip).concat([{ip,reason:'manual',ttl:3600}]);
   paintBlocks();paintConnections();
 }
+async function handleTimedAllow(button){
+  const path=button.dataset.appPath,minutes=parseInt(button.dataset.timedAllow||'10',10);
+  if(!path)return;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('set_timed_decision',{appPath:path,decision:'allow',protocol:'all',minutes});
+  state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:'allow',protocol:'all',temporary:true,expiresAtMs:Date.now()+minutes*60000,profileId:state.activeProfileId}]);
+  paintRules();paintConnections();
+}
+async function handleKillProcess(button){
+  const pid=parseInt(button.dataset.pid||'0',10),path=button.dataset.appPath;
+  if(!pid||!path)return;
+  if(hasTauriApi)await window.__TAURI__.core.invoke('kill_process',{pid,appPath:path});
+  pushHistory({id:'local-kill-'+Date.now(),tsMs:Date.now(),kind:'process-killed',title:'Process killed',body:`PID ${pid}`,appPath:path});
+}
+async function handleTargetAction(button){
+  const path=button.dataset.appPath,ip=button.dataset.ip,port=parseInt(button.dataset.port||'0',10),action=button.dataset.targetAction;
+  if(!path||!ip)return;
+  const group=applicationGroups().find(g=>keyOf(g.appPath)===keyOf(path));
+  const rule={appPath:path,appName:group?.name||appNameFromPath(path),decision:action==='allow'?'allow':'block',protocol:'all',direction:'outbound',profileId:state.activeProfileId,target:{kind:'ip',value:ip,port:port||null}};
+  if(hasTauriApi)await window.__TAURI__.core.invoke('upsert_rule',{rule});
+  state.programRules=state.programRules.filter(r=>!(keyOf(r.appPath)===keyOf(path)&&r.target?.value===ip&&Number(r.target?.port||0)===(port||0))).concat([rule]);
+  paintRules();paintConnections();
+}
 document.getElementById('connections-view').addEventListener('click',e=>{
-  if(e.target.closest('[data-conn-action],[data-ip-action]'))return;
+  const connAction=e.target.closest('[data-conn-action]');if(connAction){handleConnectionAction(connAction).catch(console.error);return;}
+  const ipAction=e.target.closest('[data-ip-action]');if(ipAction){handleIpAction(ipAction).catch(console.error);return;}
+  const timed=e.target.closest('[data-timed-allow]');if(timed){handleTimedAllow(timed).catch(console.error);return;}
+  const kill=e.target.closest('[data-kill-process]');if(kill){handleKillProcess(kill).catch(console.error);return;}
+  const target=e.target.closest('[data-target-action]');if(target){handleTargetAction(target).catch(console.error);return;}
   const toggle=e.target.closest('[data-tree-toggle]');
   if(toggle){
     const key=toggle.dataset.treeToggle;
@@ -1281,6 +1449,16 @@ document.getElementById('connections-view').addEventListener('click',e=>{
   }
   const node=e.target.closest('[data-app-key]');
   if(node){runtime.selectedAppKey=node.dataset.appKey;paintConnections();}
+});
+[
+  ['conn-search','search'],
+  ['conn-status-filter','status'],
+  ['conn-profile-filter','profile'],
+  ['conn-proto-filter','protocol'],
+  ['conn-dir-filter','direction'],
+].forEach(([id,key])=>{
+  document.getElementById(id)?.addEventListener('input',e=>{state.connectionFilters[key]=e.target.value;paintConnections();});
+  document.getElementById(id)?.addEventListener('change',e=>{state.connectionFilters[key]=e.target.value;paintConnections();});
 });
 
 // ---- data pipeline: Tauri events OR simulator -----------------------------
@@ -1342,31 +1520,43 @@ function startSimulator(){
   },1000);
 }
 
+function applyBackendState(s){
+  if(s?.toggles){state.toggles=s.toggles;
+    document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',state.toggles[el.dataset.toggle]));}
+  if(s?.config){state.config=s.config;refreshControlFields();}
+  if(s?.appSettings)state.appSettings=s.appSettings;
+  state.activeProfileId=s?.activeProfileId||state.appSettings.activeProfileId||state.activeProfileId;
+  state.backend=s?.backend||state.backend;
+  state.backendError=s?.backendError||null;
+  state.serviceStatus=s?.serviceStatus||state.serviceStatus;
+  if(s?.profiles)state.profiles=s.profiles;
+  if(s?.programRules)state.programRules=s.programRules;
+  if(s?.sessionProgramRules)state.sessionProgramRules=s.sessionProgramRules;
+  if(s?.appQuarantines)state.appQuarantines=s.appQuarantines;
+  if(s?.notificationHistory)state.notificationHistory=[...s.notificationHistory].reverse();
+  if(s?.pendingPrograms)s.pendingPrograms.forEach(queueProgram);
+  syncProfileSelectors();refreshSettingSwitches();refreshBackendStatus();paintNotifications();paintQuarantine();paintConnections();
+}
+
 function startTauri(){
   const { listen } = window.__TAURI__.event;
   listen('metrics-tick', e=>applyTick(e.payload));
   listen('program-connection-request',e=>queueProgram(e.payload));
   listen('connection-seen',e=>queueConnection(e.payload));
+  listen('traffic-sample',()=>{});
   listen('connection-snapshot',e=>queueConnectionSnapshot(e.payload));
+  listen('notification-created',e=>pushHistory(e.payload));
+  listen('rule-expired',e=>{const r=e.payload||{};state.programRules=state.programRules.filter(x=>!(keyOf(x.appPath)===keyOf(r.appPath)&&x.expiresAtMs));state.sessionProgramRules=state.sessionProgramRules.filter(x=>!(keyOf(x.appPath)===keyOf(r.appPath)&&x.expiresAtMs));paintRules();paintConnections();});
+  listen('service-status',e=>{state.serviceStatus=e.payload;refreshBackendStatus();});
   // pull initial config for thresholds/toggles
-  window.__TAURI__.core.invoke('get_state').then(s=>{
-    if(s?.toggles){state.toggles=s.toggles;
-      document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',state.toggles[el.dataset.toggle]));}
-    if(s?.config){state.config=s.config;refreshControlFields();}
-    if(s?.appSettings)state.appSettings=s.appSettings;
-    state.backend=s?.backend||state.backend;
-    state.backendError=s?.backendError||null;
-    if(s?.programRules)state.programRules=s.programRules;
-    if(s?.sessionProgramRules)state.sessionProgramRules=s.sessionProgramRules;
-    if(s?.appQuarantines)state.appQuarantines=s.appQuarantines;
-    if(s?.pendingPrograms)s.pendingPrograms.forEach(queueProgram);
-    refreshSettingSwitches();refreshBackendStatus();paintQuarantine();paintConnections();
-  }).catch(()=>{});
+  window.__TAURI__.core.invoke('get_firewall_state').then(applyBackendState).catch(()=>{});
 }
 
 // ---- boot -----------------------------------------------------------------
 render();
 initConnectionMetric();
+syncProfileSelectors();
+paintNotifications();
 setInterval(flushConnectionPulse,1000);
 frame();
 if(hasTauriApi) startTauri(); else startSimulator();

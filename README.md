@@ -41,7 +41,11 @@ _TR: Canlı trafik sinyali, ağ hareketini hızlıca hissettiren küçük bir me
 - Observes active TCP/UDP connections on Windows and maps them back to process IDs and executable paths.
 - Prompts the user at least once for newly observed internet-facing applications when "ask new apps" mode is enabled.
 - Supports **Allow** and **Quarantine** decisions with a selectable protocol scope: TCP, UDP, or both.
+- Supports V2 profiles: **Home**, **Public Wi-Fi**, **Gaming**, **Work**, and **Lockdown**.
+- Supports timed decisions: allow once, 10 minutes, 1 hour, session-only, or remembered.
+- Stores rule metadata by app, profile, protocol, direction, optional target, expiry, and timestamps.
 - Stores remembered decisions persistently and keeps non-remembered decisions alive for the current m0untain session.
+- Tracks offline-first risk labels, notification history, JSON import/export, and verified kill-process actions.
 - Installs WFP application block filters for quarantined apps.
 - Shows a simplewall-like application inventory: pending, allowed, quarantined/blocked, and observed-but-unruled apps.
 - Shows a GlassWire-like connections page with application trees, endpoints, protocols, directions, and hot remote targets.
@@ -56,6 +60,7 @@ _TR: Özetle; uygulama bazlı izin/karantina, canlı bağlantı takibi, WFP enge
 ```text
 core/          Detection engine, config, verdicts, metrics, tests
 src-tauri/    Tauri desktop shell, WFP backend, settings, tray, snapshots
+service/      V2 Windows service scaffold for future boot-time default-deny enforcement
 ui/           Single-file dark dashboard and firewall control UI
 docs/         README screenshots and documentation assets
 ```
@@ -110,8 +115,10 @@ _TR: Geliştirme sırasında `cargo tauri dev`, hızlı test için `cargo test -
    - **Allow**: let it connect.
    - **Quarantine**: block the application with WFP rules.
 4. Pick the decision scope: TCP, UDP, or all traffic.
-5. Leave "remember" enabled for persistent rules, or disable it for a session-only decision.
-6. Use the **Connections** page to inspect observed apps, endpoints, blocked traffic, and live targets.
+5. Pick duration: allow once, 10 minutes, 1 hour, session-only, or remembered.
+6. Switch profiles when needed, for example Public Wi-Fi or Lockdown.
+7. Use the **Connections** page to inspect observed apps, endpoints, blocked traffic, risk labels, and live targets.
+8. Use the **History** page to audit prompts, rules, blocks, expiry events, imports, and emergency actions.
 
 _TR: Amaç, yabancı veya beklenmeyen bir uygulama internete çıkmaya çalıştığında veri sızdırmadan önce kullanıcıdan karar almaktır._
 
@@ -121,35 +128,34 @@ _TR: Amaç, yabancı veya beklenmeyen bir uygulama internete çıkmaya çalışt
 - Core detection tests pass.
 - Windows WFP integration compiles and installs app quarantine filters.
 - Active connection snapshots are collected through Windows IP Helper APIs.
-- UI includes dashboard cards, focus animations, connection trees, quarantine controls, app decision prompts, tray behavior, and startup settings.
+- Rule Engine V2 schema is active with profile-aware, timed, directional, protocol-aware, and target-aware rule metadata.
+- UI includes dashboard cards, focus animations, profile selector, connection trees, filters, quarantine controls, timed app decision prompts, target rule actions, notification history, import/export, tray behavior, and startup settings.
+- The `service/` crate is present as the staged home for a future boot-time/default-deny Windows service.
 
 _TR: Proje çalışır durumda; güvenlik davranışları ve UI akışı hâlâ geliştirilmeye açık._
 
 ## Improvement Ideas
 
-These are the next ideas worth adding as the firewall grows:
+V2 foundations have landed. The next staged upgrades are:
 
-- Real executable icons in the application list instead of generated initials.
-- Rule profiles such as Home, Public Wi-Fi, Gaming, Work, and Lockdown.
-- Timed allow rules, for example "allow this app for 10 minutes".
-- Per-target rules by domain, IP, port, protocol, and direction.
-- DNS/domain visibility so remote IPs can be understood as human-readable names.
-- Risk labels for unsigned apps, unknown publishers, unusual ports, and suspicious destinations.
-- Notification history for every prompt, allow, quarantine, and block event.
-- Per-application traffic graphs and bandwidth totals.
-- One-click "kill process" beside quarantine for emergency containment.
-- Import/export for rules and settings.
-- A stronger default-deny mode backed by an always-on Windows service.
-- Optional reputation checks for domains, IPs, and executable signatures.
-- Search and filtering for large app inventories, similar to simplewall.
+- Implement the Windows service install/start UX and move default-deny enforcement into that always-on service.
+- Enforce app+target rules directly in WFP with remote address/port conditions instead of app-wide fallback blocks.
+- Add real executable icons by extracting Windows shell icons and caching them as app metadata.
+- Add DNS cache correlation and reverse-DNS history so IPs can be mapped to known domains when Windows can prove the relationship.
+- Add real signature/publisher checks for stronger offline reputation labels.
+- Add optional online reputation providers behind explicit API keys.
+- Add per-application byte counters once packet/flow byte telemetry is available.
 
 _TR: Bunlar projeyi daha gerçek bir “tam kontrol firewall” hissine taşıyacak sonraki adımlar._
 
 ## Development notes
 
 - Dynamic WFP sessions are preferred so temporary filters are cleaned up when the app exits.
-- Persistent app rules are stored in the app settings layer.
+- Persistent app/profile/target rules are stored in the app settings layer as `state.json` schema v2.
 - Session-only app rules remain active while m0untain is open.
+- Timed rules are pruned automatically when they expire and emit history events.
+- Online reputation is off by default; the current risk model is offline-first.
+- If the service is offline, m0untain clearly reports "app-only protection" and continues with UI-session WFP controls.
 - The first observed connection may already have reached Windows before a user decision is made; stronger pre-connection default-deny behavior should be implemented as a dedicated service/filter strategy.
 
 _TR: En güçlü güvenlik için sonraki büyük adım, uygulama açılmadan da çalışan servis tabanlı default-deny mimarisi olacaktır._
