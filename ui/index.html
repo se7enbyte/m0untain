@@ -103,11 +103,15 @@
   .status-dot{width:8px;height:8px;border-radius:50%;background:var(--inbound);box-shadow:var(--glow) var(--inbound);display:inline-block;margin-right:7px}
   .status{display:flex;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink-mid);
     border:1px solid var(--line);border-radius:999px;padding:7px 13px}
+  .status.offline{border-color:rgba(240,113,120,.45);color:var(--block);background:rgba(240,113,120,.055)}
+  .status.offline .status-dot{background:var(--block);box-shadow:var(--glow) var(--block)}
   .iconbtn{width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:#0d121a;color:var(--ink-mid);cursor:pointer;display:grid;place-items:center;position:relative}
   .iconbtn:hover{color:var(--accent);border-color:#3b4654;background:#121923}
   .iconbtn svg{width:16px;height:16px}
   .notice-badge{position:absolute;right:-4px;top:-5px;min-width:17px;height:17px;border-radius:9px;padding:0 4px;background:var(--block);color:#090b0f;font:700 10px/17px var(--mono);display:none}
   .notice-badge.show{display:block}
+  .backend-note{display:none;margin-top:10px;padding:10px;border:1px solid rgba(240,113,120,.28);border-radius:10px;background:rgba(240,113,120,.055);color:var(--ink-mid);font:10px/1.45 var(--mono)}
+  .backend-note.show{display:block}
   .nav-tabs{display:flex;gap:6px;margin-left:10px;padding:4px;border:1px solid var(--line);border-radius:999px;background:rgba(7,10,15,.45)}
   .nav-tab{border:0;background:transparent;color:var(--ink-dim);font:700 10px var(--mono);letter-spacing:1px;text-transform:uppercase;border-radius:999px;padding:8px 12px;cursor:pointer;transition:.18s ease}
   .nav-tab:hover{color:var(--ink-mid);background:#101722}
@@ -495,6 +499,7 @@ const PANELS = {
 };
 
 const state = {
+  backend:'WFP', backendError:null,
   toggles:{ ddos:true, scan:true },
   thresholds:{ ddos:'40 conn / 1s', scan:'15 ports / 3s' },
   blocks:[], talkers:[], charts:{},
@@ -595,8 +600,9 @@ function buildControls(body){
     </div>
     <div class="ctl">
       <div class="lab"><b>Enforcement</b><small>WFP session block filters</small></div>
-      <span class="thr" style="color:var(--inbound)">● active</span>
+      <span class="thr" id="enforcement-state" style="color:var(--inbound)">● active</span>
     </div>
+    <div class="backend-note" id="backend-note"></div>
     <div class="ctl">
       <div class="lab"><b>Bilinmeyen uygulamalar</b><small>m0untain açık kaldığı sürece oturum karantinası</small></div>
       <div class="switch on" data-setting-toggle="askNewApps"></div>
@@ -758,6 +764,25 @@ function refreshControlFields(){
   if(dd)dd.textContent=`${ddos.max_conns_per_window} conn / ${sec(ddos.window_ms)}s`;
   if(sc)sc.textContent=`${scan.distinct_ports_threshold} ports / ${sec(scan.window_ms)}s`;
   document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',!!state.toggles[el.dataset.toggle]));
+  refreshBackendStatus();
+}
+function refreshBackendStatus(){
+  const offline=!!state.backendError;
+  const status=document.getElementById('statusdot')?.closest('.status');
+  const text=document.getElementById('statustxt');
+  if(status)status.classList.toggle('offline',offline);
+  if(text)text.textContent=offline?`${state.backend||'Firewall'} · admin required`:`${state.backend||'WFP'} · live`;
+  const enforcement=document.getElementById('enforcement-state');
+  if(enforcement){
+    enforcement.textContent=offline?'● offline':'● active';
+    enforcement.style.color=offline?'var(--block)':'var(--inbound)';
+    enforcement.title=state.backendError||'';
+  }
+  const note=document.getElementById('backend-note');
+  if(note){
+    note.classList.toggle('show',offline);
+    note.textContent=offline?`Firewall backend could not start: ${state.backendError}. Run m0untain as administrator for real WFP enforcement.`:'';
+  }
 }
 async function applyConfig(){
   const num=(id,fallback)=>Math.max(1,parseInt(document.getElementById(id)?.value||fallback,10)||fallback);
@@ -1329,12 +1354,13 @@ function startTauri(){
       document.querySelectorAll('[data-toggle]').forEach(el=>el.classList.toggle('on',state.toggles[el.dataset.toggle]));}
     if(s?.config){state.config=s.config;refreshControlFields();}
     if(s?.appSettings)state.appSettings=s.appSettings;
+    state.backend=s?.backend||state.backend;
+    state.backendError=s?.backendError||null;
     if(s?.programRules)state.programRules=s.programRules;
     if(s?.sessionProgramRules)state.sessionProgramRules=s.sessionProgramRules;
     if(s?.appQuarantines)state.appQuarantines=s.appQuarantines;
     if(s?.pendingPrograms)s.pendingPrograms.forEach(queueProgram);
-    refreshSettingSwitches();paintQuarantine();paintConnections();
-    document.getElementById('statustxt').textContent=`${s?.backend||'WFP'} · live`;
+    refreshSettingSwitches();refreshBackendStatus();paintQuarantine();paintConnections();
   }).catch(()=>{});
 }
 

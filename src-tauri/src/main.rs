@@ -23,7 +23,7 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WindowEvent};
 
 use active_connections::ActiveConnection;
-use wfp::{AppProtocol, Firewall, PlatformFirewall, RawConn};
+use wfp::{AppProtocol, Firewall, RawConn};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -97,11 +97,40 @@ struct KnownApp {
     app_id: Vec<u8>,
 }
 
+struct DisabledFirewall {
+    message: String,
+}
+
+impl DisabledFirewall {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+impl Firewall for DisabledFirewall {
+    fn block_ip(&self, _ip: IpAddr) -> Result<u64, String> {
+        Err(self.message.clone())
+    }
+
+    fn block_app(&self, _app_id: &[u8], _protocol: AppProtocol) -> Result<u64, String> {
+        Err(self.message.clone())
+    }
+
+    fn unblock(&self, _handle: u64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn backend(&self) -> &'static str {
+        "Unavailable"
+    }
+}
+
 struct Shared {
     engine: Mutex<Engine>,
     metrics: Mutex<Metrics>,
     talkers: Mutex<Talkers>,
-    fw: PlatformFirewall,
+    fw: Box<dyn Firewall>,
+    backend_error: Option<String>,
     enforced: Mutex<HashMap<IpAddr, (u64, u64)>>,
     app_settings: Mutex<AppSettings>,
     program_rules: Mutex<HashMap<String, ProgramRule>>,
@@ -449,6 +478,7 @@ fn get_state(state: State<Arc<Shared>>) -> serde_json::Value {
         .collect();
     serde_json::json!({
         "backend": state.fw.backend(),
+        "backendError": state.backend_error.clone(),
         "toggles": { "ddos": cfg.ddos.enabled, "scan": cfg.scan.enabled },
         "config": cfg,
         "appSettings": state.app_settings.lock().unwrap().clone(),
@@ -858,16 +888,20 @@ fn main() {
             let persistence_path = settings::default_path(config_dir);
             let persistent = settings::load(&persistence_path);
             let (tx, rx) = channel::<RawConn>();
-            let fw = wfp::start(tx).map_err(|error| {
-                eprintln!("firewall backend failed to start: {error}");
-                error
-            })?;
+            let (fw, backend_error): (Box<dyn Firewall>, Option<String>) = match wfp::start(tx) {
+                Ok(fw) => (Box::new(fw), None),
+                Err(error) => {
+                    eprintln!("firewall backend failed to start: {error}");
+                    (Box::new(DisabledFirewall::new(error.clone())), Some(error))
+                }
+            };
 
             let shared = Arc::new(Shared {
                 engine: Mutex::new(Engine::new(cfg)),
                 metrics: Mutex::new(Metrics::new(1000, 180)),
                 talkers: Mutex::new(Talkers::new(60_000)),
                 fw,
+                backend_error,
                 enforced: Mutex::new(HashMap::new()),
                 app_settings: Mutex::new(persistent.settings),
                 program_rules: Mutex::new(persistent.rules),
