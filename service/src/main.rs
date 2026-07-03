@@ -1,4 +1,6 @@
 fn main() {
-    let status = m0untain_service::current_status();
-    println!("{}", status.message);
+    if let Err(error) = m0untain_service::run() {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
 }

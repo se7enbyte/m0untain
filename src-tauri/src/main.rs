@@ -26,7 +26,7 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WindowEvent};
 
 use active_connections::ActiveConnection;
-use wfp::{AppProtocol, Firewall, RawConn};
+use wfp::{AppProtocol, Firewall, RawConn, RemoteMatch};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -105,6 +105,19 @@ struct KnownApp {
 struct DisabledFirewall {
     message: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServiceControlStatus {
+    installed: bool,
+    running: bool,
+    mode: String,
+    message: String,
+    pid: Option<u32>,
+    binary_path: Option<String>,
+}
+
+const SERVICE_NAME: &str = "m0untain-service";
 
 impl DisabledFirewall {
     fn new(message: String) -> Self {
@@ -263,6 +276,14 @@ fn rule_storage_key(rule: &ProgramRule) -> String {
     )
 }
 
+fn runtime_block_key(rule_key: &str, rule: &ProgramRule) -> String {
+    if target_is_specific(&rule.target) {
+        rule_key.to_string()
+    } else {
+        app_key(&rule.app_path)
+    }
+}
+
 fn normalize_rule(mut rule: ProgramRule, active_profile_id: &str, now: u64) -> ProgramRule {
     rule.decision = normalize_decision(&rule.decision).unwrap_or_else(|_| "allow".to_string());
     rule.protocol = normalize_protocol(&rule.protocol);
@@ -278,6 +299,100 @@ fn normalize_rule(mut rule: ProgramRule, active_profile_id: &str, now: u64) -> P
         rule.app_name = app_name(&rule.app_path);
     }
     rule
+}
+
+fn remote_match_from_target(target: &Option<RuleTarget>) -> Result<Option<RemoteMatch>, String> {
+    let Some(target) = target else {
+        return Ok(None);
+    };
+    match target.kind.to_lowercase().as_str() {
+        "any" => Ok(None),
+        "ip" => target
+            .value
+            .parse::<IpAddr>()
+            .map(RemoteMatch::Ip)
+            .map(Some)
+            .map_err(|_| "invalid target IP".to_string()),
+        "cidr" => {
+            let Some((network, prefix)) = target.value.split_once('/') else {
+                return Err("invalid CIDR target".to_string());
+            };
+            let network = network
+                .parse::<IpAddr>()
+                .map_err(|_| "invalid CIDR network".to_string())?;
+            let prefix = prefix
+                .parse::<u8>()
+                .map_err(|_| "invalid CIDR prefix".to_string())?;
+            match network {
+                IpAddr::V4(_) if prefix <= 32 => Ok(Some(RemoteMatch::Cidr { network, prefix })),
+                IpAddr::V6(_) if prefix <= 128 => Ok(Some(RemoteMatch::Cidr { network, prefix })),
+                _ => Err("CIDR prefix is out of range".to_string()),
+            }
+        }
+        // Domain rules stay in the V2 rule engine until DNS cache correlation
+        // can prove an IP/domain relationship. Do not widen to app-wide block.
+        "domain" => Ok(None),
+        _ => Ok(None),
+    }
+}
+
+fn is_domain_target(target: &Option<RuleTarget>) -> bool {
+    target
+        .as_ref()
+        .is_some_and(|target| target.kind.eq_ignore_ascii_case("domain"))
+}
+
+fn install_block_for_rule(
+    shared: &Shared,
+    rule_key: &str,
+    rule: &ProgramRule,
+) -> Result<(), String> {
+    if rule.app_id.is_empty() {
+        return Err("rule has no WFP application id".to_string());
+    }
+    if is_domain_target(&rule.target) {
+        return Ok(());
+    }
+    let protocol = parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All);
+    let remote = remote_match_from_target(&rule.target)?;
+    let remote_port = rule.target.as_ref().and_then(|target| target.port);
+    let handle = if remote.is_some() || remote_port.is_some() {
+        shared
+            .fw
+            .block_app_target(&rule.app_id, protocol, remote, remote_port)?
+    } else {
+        shared.fw.block_app(&rule.app_id, protocol)?
+    };
+    let block_key = runtime_block_key(rule_key, rule);
+    if let Some(old) = shared.app_blocks.lock().unwrap().insert(
+        block_key,
+        RuntimeAppBlock {
+            handle,
+            app_path: rule.app_path.clone(),
+            app_name: rule.app_name.clone(),
+            protocol: rule.protocol.clone(),
+            temporary: rule.expires_at_ms.is_some(),
+        },
+    ) {
+        let _ = shared.fw.unblock(old.handle);
+    }
+    Ok(())
+}
+
+fn remove_runtime_blocks_for_app(shared: &Shared, key: &str) {
+    let block_keys: Vec<String> = shared
+        .app_blocks
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(_, block)| app_key(&block.app_path) == key)
+        .map(|(block_key, _)| block_key.clone())
+        .collect();
+    for block_key in block_keys {
+        if let Some(block) = shared.app_blocks.lock().unwrap().remove(&block_key) {
+            let _ = shared.fw.unblock(block.handle);
+        }
+    }
 }
 
 fn protocol_matches(rule_protocol: &str, observed_protocol: &str) -> bool {
@@ -724,6 +839,259 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+#[cfg(windows)]
+mod service_control {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::{Path, PathBuf};
+
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Services::*;
+
+    use super::{ServiceControlStatus, SERVICE_NAME};
+
+    const DELETE_ACCESS: u32 = 0x0001_0000;
+
+    fn wide(value: impl AsRef<OsStr>) -> Vec<u16> {
+        value
+            .as_ref()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    }
+
+    fn service_binary_path() -> Result<PathBuf, String> {
+        let current = std::env::current_exe().map_err(|error| error.to_string())?;
+        let sibling = current.with_file_name("m0untain-service.exe");
+        if sibling.exists() {
+            return Ok(sibling);
+        }
+        Err(format!(
+            "m0untain-service.exe was not found next to {}. Build the service binary or include it in the app bundle first.",
+            current.display()
+        ))
+    }
+
+    unsafe fn open_manager(access: u32) -> Result<SC_HANDLE, String> {
+        OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), access).map_err(|error| error.to_string())
+    }
+
+    unsafe fn open_service(manager: SC_HANDLE, access: u32) -> Result<SC_HANDLE, String> {
+        let name = wide(SERVICE_NAME);
+        OpenServiceW(manager, PCWSTR(name.as_ptr()), access).map_err(|error| error.to_string())
+    }
+
+    unsafe fn close(handle: SC_HANDLE) {
+        let _ = CloseServiceHandle(handle);
+    }
+
+    fn command_line(binary: &Path, state_path: &Path) -> String {
+        format!(
+            "\"{}\" --state \"{}\"",
+            binary.display(),
+            state_path.display()
+        )
+    }
+
+    pub fn install(state_path: &Path) -> Result<(), String> {
+        let binary = service_binary_path()?;
+        let command = command_line(&binary, state_path);
+        let name = wide(SERVICE_NAME);
+        let display = wide("m0untain default-deny firewall service");
+        let command = wide(command);
+        unsafe {
+            let manager = open_manager(SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE)?;
+            let existing = open_service(
+                manager,
+                SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
+            );
+            if let Ok(service) = existing {
+                ChangeServiceConfigW(
+                    service,
+                    SERVICE_WIN32_OWN_PROCESS,
+                    SERVICE_AUTO_START,
+                    SERVICE_ERROR_NORMAL,
+                    PCWSTR(command.as_ptr()),
+                    PCWSTR::null(),
+                    None,
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    PCWSTR(display.as_ptr()),
+                )
+                .map_err(|error| error.to_string())?;
+                close(service);
+                close(manager);
+                return Ok(());
+            }
+
+            let service = CreateServiceW(
+                manager,
+                PCWSTR(name.as_ptr()),
+                PCWSTR(display.as_ptr()),
+                SERVICE_ALL_ACCESS,
+                SERVICE_WIN32_OWN_PROCESS,
+                SERVICE_AUTO_START,
+                SERVICE_ERROR_NORMAL,
+                PCWSTR(command.as_ptr()),
+                PCWSTR::null(),
+                None,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                PCWSTR::null(),
+            )
+            .map_err(|error| error.to_string())?;
+            close(service);
+            close(manager);
+        }
+        Ok(())
+    }
+
+    pub fn start() -> Result<(), String> {
+        unsafe {
+            let manager = open_manager(SC_MANAGER_CONNECT)?;
+            let service = open_service(manager, SERVICE_START | SERVICE_QUERY_STATUS)?;
+            let result = StartServiceW(service, None);
+            close(service);
+            close(manager);
+            result.map_err(|error| error.to_string())
+        }
+    }
+
+    pub fn stop() -> Result<(), String> {
+        unsafe {
+            let manager = open_manager(SC_MANAGER_CONNECT)?;
+            let service = open_service(manager, SERVICE_STOP | SERVICE_QUERY_STATUS)?;
+            let mut status = SERVICE_STATUS::default();
+            let result = ControlService(service, SERVICE_CONTROL_STOP, &mut status);
+            close(service);
+            close(manager);
+            result.map_err(|error| error.to_string())
+        }
+    }
+
+    pub fn uninstall() -> Result<(), String> {
+        unsafe {
+            let manager = open_manager(SC_MANAGER_CONNECT)?;
+            let service =
+                open_service(manager, DELETE_ACCESS | SERVICE_STOP | SERVICE_QUERY_STATUS)?;
+            let mut status = SERVICE_STATUS::default();
+            let _ = ControlService(service, SERVICE_CONTROL_STOP, &mut status);
+            let result = DeleteService(service);
+            close(service);
+            close(manager);
+            result.map_err(|error| error.to_string())
+        }
+    }
+
+    pub fn status() -> ServiceControlStatus {
+        unsafe {
+            let manager = match open_manager(SC_MANAGER_CONNECT) {
+                Ok(manager) => manager,
+                Err(error) => {
+                    return ServiceControlStatus {
+                        installed: false,
+                        running: false,
+                        mode: "unavailable".to_string(),
+                        message: format!("SCM unavailable: {error}"),
+                        pid: None,
+                        binary_path: service_binary_path()
+                            .ok()
+                            .map(|path| path.display().to_string()),
+                    }
+                }
+            };
+            let service = match open_service(manager, SERVICE_QUERY_STATUS) {
+                Ok(service) => service,
+                Err(_) => {
+                    close(manager);
+                    return ServiceControlStatus {
+                        installed: false,
+                        running: false,
+                        mode: "not-installed".to_string(),
+                        message: "Default-deny service is not installed.".to_string(),
+                        pid: None,
+                        binary_path: service_binary_path()
+                            .ok()
+                            .map(|path| path.display().to_string()),
+                    };
+                }
+            };
+            let mut status = SERVICE_STATUS_PROCESS::default();
+            let mut needed = 0;
+            let buffer = std::slice::from_raw_parts_mut(
+                (&mut status as *mut SERVICE_STATUS_PROCESS).cast::<u8>(),
+                std::mem::size_of::<SERVICE_STATUS_PROCESS>(),
+            );
+            let query =
+                QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, Some(buffer), &mut needed);
+            close(service);
+            close(manager);
+            if let Err(error) = query {
+                return ServiceControlStatus {
+                    installed: true,
+                    running: false,
+                    mode: "unknown".to_string(),
+                    message: format!("Service installed, status query failed: {error}"),
+                    pid: None,
+                    binary_path: service_binary_path()
+                        .ok()
+                        .map(|path| path.display().to_string()),
+                };
+            }
+            let running = status.dwCurrentState == SERVICE_RUNNING;
+            ServiceControlStatus {
+                installed: true,
+                running,
+                mode: if running {
+                    "default-deny-service".to_string()
+                } else {
+                    "installed-stopped".to_string()
+                },
+                message: if running {
+                    "Default-deny service is running at boot/service level.".to_string()
+                } else {
+                    "Default-deny service is installed but stopped.".to_string()
+                },
+                pid: (status.dwProcessId != 0).then_some(status.dwProcessId),
+                binary_path: service_binary_path()
+                    .ok()
+                    .map(|path| path.display().to_string()),
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+mod service_control {
+    use std::path::Path;
+
+    use super::ServiceControlStatus;
+
+    pub fn install(_state_path: &Path) -> Result<(), String> {
+        Err("Windows service install is only available on Windows".to_string())
+    }
+    pub fn start() -> Result<(), String> {
+        Err("Windows service start is only available on Windows".to_string())
+    }
+    pub fn stop() -> Result<(), String> {
+        Err("Windows service stop is only available on Windows".to_string())
+    }
+    pub fn uninstall() -> Result<(), String> {
+        Err("Windows service uninstall is only available on Windows".to_string())
+    }
+    pub fn status() -> ServiceControlStatus {
+        ServiceControlStatus {
+            installed: false,
+            running: false,
+            mode: "unsupported".to_string(),
+            message: "Windows service is only available on Windows.".to_string(),
+            pid: None,
+            binary_path: None,
+        }
+    }
+}
+
 fn install_tray(app: &tauri::App) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "show", "m0untain'ı aç", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
@@ -775,12 +1143,15 @@ fn push_notification(
 
 fn service_status(shared: &Shared) -> serde_json::Value {
     let backend_error = shared.backend_error.clone();
+    let service = service_control::status();
     serde_json::json!({
-        "installed": false,
-        "running": false,
-        "mode": if backend_error.is_some() { "offline" } else { "app-only" },
-        "defaultDenyService": "design-ready",
-        "message": backend_error.unwrap_or_else(|| "Windows service is not installed yet; m0untain is enforcing app-session WFP rules while the UI is running.".to_string()),
+        "installed": service.installed,
+        "running": service.running,
+        "mode": if backend_error.is_some() && !service.running { "offline".to_string() } else if service.running { service.mode.clone() } else { "app-only".to_string() },
+        "defaultDenyService": if service.running { "running" } else if service.installed { "installed" } else { "not-installed" },
+        "message": backend_error.unwrap_or(service.message),
+        "pid": service.pid,
+        "binaryPath": service.binary_path,
     })
 }
 
@@ -794,7 +1165,7 @@ fn quarantine_snapshot(shared: &Shared) -> Vec<AppQuarantine> {
         if !rule.is_blocking() {
             continue;
         }
-        let active = app_blocks.contains_key(key);
+        let active = app_blocks.contains_key(&runtime_block_key(key, rule));
         seen.insert(key.clone());
         out.push(AppQuarantine {
             app_path: rule.app_path.clone(),
@@ -1073,9 +1444,7 @@ fn remove_program_rule(app_path: String, state: State<Arc<Shared>>) -> Result<()
     let key = app_key(&app_path);
     remove_rules_for_app(&mut state.program_rules.lock().unwrap(), &key);
     remove_rules_for_app(&mut state.session_program_rules.lock().unwrap(), &key);
-    if let Some(block) = state.app_blocks.lock().unwrap().remove(&key) {
-        let _ = state.fw.unblock(block.handle);
-    }
+    remove_runtime_blocks_for_app(&state, &key);
     state.save()
 }
 
@@ -1087,7 +1456,7 @@ fn set_program_rule_decision(
     state: State<Arc<Shared>>,
 ) -> Result<(), String> {
     let decision = normalize_decision(&decision)?;
-    let scope = parse_protocol(&protocol)?;
+    let _ = parse_protocol(&protocol)?;
     let key = app_key(&app_path);
     let known = state.known_apps.lock().unwrap().get(&key).cloned();
     let now = now_ms();
@@ -1120,27 +1489,12 @@ fn set_program_rule_decision(
     };
 
     if decision == "allow" {
-        let mut app_blocks = state.app_blocks.lock().unwrap();
-        if let Some(block) = app_blocks
-            .remove(&rule_key)
-            .or_else(|| app_blocks.remove(&key))
-        {
-            let _ = state.fw.unblock(block.handle);
-        }
+        remove_runtime_blocks_for_app(&state, &key);
     } else {
-        let handle = state.fw.block_app(&rule.app_id, scope)?;
-        if let Some(old) = state.app_blocks.lock().unwrap().insert(
-            key.clone(),
-            RuntimeAppBlock {
-                handle,
-                app_path: rule.app_path.clone(),
-                app_name: rule.app_name.clone(),
-                protocol: protocol.clone(),
-                temporary: false,
-            },
-        ) {
-            let _ = state.fw.unblock(old.handle);
-        }
+        let mut block_rule = rule.clone();
+        block_rule.protocol = protocol.clone();
+        block_rule.target = None;
+        install_block_for_rule(&state, &key, &block_rule)?;
     }
 
     rule.decision = decision;
@@ -1271,26 +1625,9 @@ fn upsert_rule(
     let app_block_key = app_key(&rule.app_path);
 
     if rule.is_blocking() && !rule.app_id.is_empty() {
-        let handle = state.fw.block_app(
-            &rule.app_id,
-            parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
-        )?;
-        if let Some(old) = state.app_blocks.lock().unwrap().insert(
-            app_block_key.clone(),
-            RuntimeAppBlock {
-                handle,
-                app_path: rule.app_path.clone(),
-                app_name: rule.app_name.clone(),
-                protocol: rule.protocol.clone(),
-                temporary: rule.expires_at_ms.is_some(),
-            },
-        ) {
-            let _ = state.fw.unblock(old.handle);
-        }
+        install_block_for_rule(&state, &rule_id, &rule)?;
     } else if rule.decision == "allow" {
-        if let Some(old) = state.app_blocks.lock().unwrap().remove(&app_block_key) {
-            let _ = state.fw.unblock(old.handle);
-        }
+        remove_runtime_blocks_for_app(&state, &app_block_key);
     }
 
     state
@@ -1328,9 +1665,7 @@ fn remove_rule(
         .or_else(|| state.session_program_rules.lock().unwrap().remove(&rule_id));
     if let Some(rule) = removed {
         let key = app_key(&rule.app_path);
-        if let Some(block) = state.app_blocks.lock().unwrap().remove(&key) {
-            let _ = state.fw.unblock(block.handle);
-        }
+        remove_runtime_blocks_for_app(&state, &key);
         state.save()?;
         push_notification(
             state.inner(),
@@ -1379,22 +1714,7 @@ fn set_timed_decision(
     };
     let rule_id = rule_storage_key(&rule);
     if rule.is_blocking() {
-        let handle = state.fw.block_app(
-            &rule.app_id,
-            parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
-        )?;
-        if let Some(old) = state.app_blocks.lock().unwrap().insert(
-            key,
-            RuntimeAppBlock {
-                handle,
-                app_path: rule.app_path.clone(),
-                app_name: rule.app_name.clone(),
-                protocol: rule.protocol.clone(),
-                temporary: true,
-            },
-        ) {
-            let _ = state.fw.unblock(old.handle);
-        }
+        install_block_for_rule(&state, &rule_id, &rule)?;
     }
     state
         .session_program_rules
@@ -1541,6 +1861,77 @@ fn resolve_endpoint(ip: String) -> serde_json::Value {
     })
 }
 
+#[tauri::command]
+fn get_service_status(state: State<Arc<Shared>>) -> serde_json::Value {
+    service_status(&state)
+}
+
+#[tauri::command]
+fn install_service(state: State<Arc<Shared>>, app: tauri::AppHandle) -> Result<(), String> {
+    state.save()?;
+    service_control::install(&state.persistence_path)?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "service-installed",
+        "Default-deny service installed",
+        "m0untain-service is configured for automatic startup.",
+        None,
+        None,
+    );
+    let _ = app.emit("service-status", service_status(&state));
+    Ok(())
+}
+
+#[tauri::command]
+fn start_service(state: State<Arc<Shared>>, app: tauri::AppHandle) -> Result<(), String> {
+    state.save()?;
+    service_control::start()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "service-started",
+        "Default-deny service started",
+        "Boot-level firewall enforcement is starting.",
+        None,
+        None,
+    );
+    let _ = app.emit("service-status", service_status(&state));
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_service(state: State<Arc<Shared>>, app: tauri::AppHandle) -> Result<(), String> {
+    service_control::stop()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "service-stopped",
+        "Default-deny service stopped",
+        "m0untain fell back to app-only protection.",
+        None,
+        None,
+    );
+    let _ = app.emit("service-status", service_status(&state));
+    Ok(())
+}
+
+#[tauri::command]
+fn uninstall_service(state: State<Arc<Shared>>, app: tauri::AppHandle) -> Result<(), String> {
+    service_control::uninstall()?;
+    push_notification(
+        state.inner(),
+        Some(&app),
+        "service-uninstalled",
+        "Default-deny service uninstalled",
+        "Boot-level enforcement was removed.",
+        None,
+        None,
+    );
+    let _ = app.emit("service-status", service_status(&state));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1671,9 +2062,9 @@ fn prune_expired_rules(shared: &Arc<Shared>, app: &tauri::AppHandle, now: u64) {
     if expired.is_empty() {
         return;
     }
-    for (_, rule, _) in &expired {
-        let key = app_key(&rule.app_path);
-        if let Some(block) = shared.app_blocks.lock().unwrap().remove(&key) {
+    for (rule_key, rule, _) in &expired {
+        let block_key = runtime_block_key(rule_key, rule);
+        if let Some(block) = shared.app_blocks.lock().unwrap().remove(&block_key) {
             let _ = shared.fw.unblock(block.handle);
         }
         let _ = app.emit("rule-expired", rule.clone());
@@ -1718,25 +2109,9 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         raw.remote_port,
         now_ms(),
     ) {
-        if rule.is_blocking()
-            && !shared.app_blocks.lock().unwrap().contains_key(&rule_key)
-            && !shared.app_blocks.lock().unwrap().contains_key(&key)
-        {
-            if let Ok(handle) = shared.fw.block_app(
-                &rule.app_id,
-                parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
-            ) {
-                shared.app_blocks.lock().unwrap().insert(
-                    key.clone(),
-                    RuntimeAppBlock {
-                        handle,
-                        app_path: rule.app_path,
-                        app_name: rule.app_name,
-                        protocol: rule.protocol,
-                        temporary: false,
-                    },
-                );
-            }
+        let block_key = runtime_block_key(&rule_key, &rule);
+        if rule.is_blocking() && !shared.app_blocks.lock().unwrap().contains_key(&block_key) {
+            let _ = install_block_for_rule(shared, &rule_key, &rule);
         }
         return;
     }
@@ -1965,26 +2340,7 @@ fn main() {
             // Restore remembered quarantine rules before consuming new events.
             for (key, rule) in shared.program_rules.lock().unwrap().clone() {
                 if rule.is_blocking() {
-                    let block_key = if rule.app_path.trim().is_empty() {
-                        key
-                    } else {
-                        app_key(&rule.app_path)
-                    };
-                    if let Ok(handle) = shared.fw.block_app(
-                        &rule.app_id,
-                        parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All),
-                    ) {
-                        shared.app_blocks.lock().unwrap().insert(
-                            block_key,
-                            RuntimeAppBlock {
-                                handle,
-                                app_path: rule.app_path,
-                                app_name: rule.app_name,
-                                protocol: rule.protocol,
-                                temporary: false,
-                            },
-                        );
-                    }
+                    let _ = install_block_for_rule(&shared, &key, &rule);
                 }
             }
 
@@ -2034,7 +2390,12 @@ fn main() {
             export_state,
             import_state,
             kill_process,
-            resolve_endpoint
+            resolve_endpoint,
+            get_service_status,
+            install_service,
+            start_service,
+            stop_service,
+            uninstall_service
         ])
         .run(tauri::generate_context!())
         .expect("error while running m0untain");

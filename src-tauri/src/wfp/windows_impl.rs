@@ -29,7 +29,7 @@ use windows::Win32::Foundation::*;
 use windows::Win32::NetworkManagement::WindowsFilteringPlatform::*;
 use windows::Win32::System::Rpc::RPC_C_AUTHN_WINNT;
 
-use super::{AppProtocol, Firewall, RawConn};
+use super::{AppProtocol, Firewall, RawConn, RemoteMatch};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -166,16 +166,24 @@ impl WfpFirewall {
         app_id: &[u8],
         layer: GUID,
         protocol: AppProtocol,
-    ) -> Result<u64, String> {
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<Option<u64>, String> {
         if app_id.is_empty() || app_id.len() > u32::MAX as usize {
             return Err("invalid WFP application identifier".to_string());
+        }
+        if !target_matches_layer(remote, layer) {
+            return Ok(None);
         }
 
         let mut blob = FWP_BYTE_BLOB {
             size: app_id.len() as u32,
             data: app_id.as_ptr() as *mut u8,
         };
-        let mut conditions = Vec::with_capacity(2);
+        let mut conditions = Vec::with_capacity(4);
+        let mut v6_storage: FWP_BYTE_ARRAY16;
+        let mut v4_mask_storage: FWP_V4_ADDR_AND_MASK;
+        let mut v6_mask_storage: FWP_V6_ADDR_AND_MASK;
 
         let mut app_condition = FWPM_FILTER_CONDITION0::default();
         app_condition.fieldKey = FWPM_CONDITION_ALE_APP_ID;
@@ -197,6 +205,58 @@ impl WfpFirewall {
             conditions.push(protocol_condition);
         }
 
+        if let Some(remote) = remote {
+            let mut remote_condition = FWPM_FILTER_CONDITION0::default();
+            remote_condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+            remote_condition.matchType = FWP_MATCH_EQUAL;
+            match remote {
+                RemoteMatch::Ip(IpAddr::V4(ip)) => {
+                    remote_condition.conditionValue.r#type = FWP_UINT32;
+                    remote_condition.conditionValue.Anonymous.uint32 =
+                        u32::from_be_bytes(ip.octets());
+                }
+                RemoteMatch::Ip(IpAddr::V6(ip)) => {
+                    remote_condition.conditionValue.r#type = FWP_BYTE_ARRAY16_TYPE;
+                    v6_storage = FWP_BYTE_ARRAY16 {
+                        byteArray16: ip.octets(),
+                    };
+                    remote_condition.conditionValue.Anonymous.byteArray16 = &mut v6_storage;
+                }
+                RemoteMatch::Cidr {
+                    network: IpAddr::V4(network),
+                    prefix,
+                } => {
+                    remote_condition.conditionValue.r#type = FWP_V4_ADDR_MASK;
+                    v4_mask_storage = FWP_V4_ADDR_AND_MASK {
+                        addr: u32::from_be_bytes(network.octets()),
+                        mask: ipv4_prefix_mask(prefix),
+                    };
+                    remote_condition.conditionValue.Anonymous.v4AddrMask = &mut v4_mask_storage;
+                }
+                RemoteMatch::Cidr {
+                    network: IpAddr::V6(network),
+                    prefix,
+                } => {
+                    remote_condition.conditionValue.r#type = FWP_V6_ADDR_MASK;
+                    v6_mask_storage = FWP_V6_ADDR_AND_MASK {
+                        addr: network.octets(),
+                        prefixLength: prefix,
+                    };
+                    remote_condition.conditionValue.Anonymous.v6AddrMask = &mut v6_mask_storage;
+                }
+            }
+            conditions.push(remote_condition);
+        }
+
+        if let Some(port) = remote_port {
+            let mut port_condition = FWPM_FILTER_CONDITION0::default();
+            port_condition.fieldKey = FWPM_CONDITION_IP_REMOTE_PORT;
+            port_condition.matchType = FWP_MATCH_EQUAL;
+            port_condition.conditionValue.r#type = FWP_UINT16;
+            port_condition.conditionValue.Anonymous.uint16 = port;
+            conditions.push(port_condition);
+        }
+
         let mut filter = FWPM_FILTER0::default();
         filter.layerKey = layer;
         filter.subLayerKey = SUBLAYER_KEY;
@@ -213,7 +273,31 @@ impl WfpFirewall {
         if err != ERROR_SUCCESS.0 {
             return Err(format!("FwpmFilterAdd0(app) failed: {err}"));
         }
-        Ok(id)
+        Ok(Some(id))
+    }
+}
+
+fn ipv4_prefix_mask(prefix: u8) -> u32 {
+    if prefix == 0 {
+        0
+    } else {
+        u32::MAX << (32 - prefix.min(32))
+    }
+}
+
+fn target_matches_layer(remote: Option<RemoteMatch>, layer: GUID) -> bool {
+    match remote {
+        Some(RemoteMatch::Ip(IpAddr::V4(_)))
+        | Some(RemoteMatch::Cidr {
+            network: IpAddr::V4(_),
+            ..
+        }) => layer == FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+        Some(RemoteMatch::Ip(IpAddr::V6(_)))
+        | Some(RemoteMatch::Cidr {
+            network: IpAddr::V6(_),
+            ..
+        }) => layer == FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+        None => true,
     }
 }
 
@@ -252,15 +336,36 @@ impl Firewall for WfpFirewall {
     }
 
     fn block_app(&self, app_id: &[u8], protocol: AppProtocol) -> Result<u64, String> {
+        self.block_app_target(app_id, protocol, None, None)
+    }
+
+    fn block_app_target(
+        &self,
+        app_id: &[u8],
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<u64, String> {
         let mut ids = Vec::with_capacity(2);
         unsafe {
-            ids.push(self.add_app_block_filter(
+            if let Some(id) = self.add_app_block_filter(
                 app_id,
                 FWPM_LAYER_ALE_AUTH_CONNECT_V4,
                 protocol,
-            )?);
-            match self.add_app_block_filter(app_id, FWPM_LAYER_ALE_AUTH_CONNECT_V6, protocol) {
-                Ok(id) => ids.push(id),
+                remote,
+                remote_port,
+            )? {
+                ids.push(id);
+            }
+            match self.add_app_block_filter(
+                app_id,
+                FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+                protocol,
+                remote,
+                remote_port,
+            ) {
+                Ok(Some(id)) => ids.push(id),
+                Ok(None) => {}
                 Err(error) => {
                     for id in ids {
                         let _ = FwpmFilterDeleteById0(self.engine, id);
@@ -268,6 +373,9 @@ impl Firewall for WfpFirewall {
                     return Err(error);
                 }
             }
+        }
+        if ids.is_empty() {
+            return Err("target does not match an ALE connect layer".to_string());
         }
         let mut next = self.next_handle.lock().unwrap();
         let handle = *next;

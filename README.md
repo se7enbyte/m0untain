@@ -47,6 +47,8 @@ _TR: Canlı trafik sinyali, ağ hareketini hızlıca hissettiren küçük bir me
 - Stores remembered decisions persistently and keeps non-remembered decisions alive for the current m0untain session.
 - Tracks offline-first risk labels, notification history, JSON import/export, and verified kill-process actions.
 - Installs WFP application block filters for quarantined apps.
+- Installs WFP app+target filters for IP/CIDR/port-scoped block rules.
+- Can install/start/stop/uninstall an automatic Windows service for boot-time default-deny enforcement.
 - Shows a simplewall-like application inventory: pending, allowed, quarantined/blocked, and observed-but-unruled apps.
 - Shows a GlassWire-like connections page with application trees, endpoints, protocols, directions, and hot remote targets.
 - Includes IDS-style detection for inbound per-IP flood/DDoS pressure and port-scan/recon patterns.
@@ -60,7 +62,7 @@ _TR: Özetle; uygulama bazlı izin/karantina, canlı bağlantı takibi, WFP enge
 ```text
 core/          Detection engine, config, verdicts, metrics, tests
 src-tauri/    Tauri desktop shell, WFP backend, settings, tray, snapshots
-service/      V2 Windows service scaffold for future boot-time default-deny enforcement
+service/      Windows service for boot-time default-deny WFP enforcement
 ui/           Single-file dark dashboard and firewall control UI
 docs/         README screenshots and documentation assets
 ```
@@ -87,6 +89,7 @@ From the project root:
 
 ```powershell
 cargo test --workspace
+cargo build -p m0untain-service
 cargo tauri dev
 ```
 
@@ -94,6 +97,7 @@ For a release build:
 
 ```powershell
 cargo build -p m0untain --release
+cargo build -p m0untain-service --release
 cargo tauri build
 ```
 
@@ -119,6 +123,7 @@ _TR: Geliştirme sırasında `cargo tauri dev`, hızlı test için `cargo test -
 6. Switch profiles when needed, for example Public Wi-Fi or Lockdown.
 7. Use the **Connections** page to inspect observed apps, endpoints, blocked traffic, risk labels, and live targets.
 8. Use the **History** page to audit prompts, rules, blocks, expiry events, imports, and emergency actions.
+9. Use the **History** service controls to install/start the default-deny Windows service when you want boot-time protection.
 
 _TR: Amaç, yabancı veya beklenmeyen bir uygulama internete çıkmaya çalıştığında veri sızdırmadan önce kullanıcıdan karar almaktır._
 
@@ -129,8 +134,8 @@ _TR: Amaç, yabancı veya beklenmeyen bir uygulama internete çıkmaya çalışt
 - Windows WFP integration compiles and installs app quarantine filters.
 - Active connection snapshots are collected through Windows IP Helper APIs.
 - Rule Engine V2 schema is active with profile-aware, timed, directional, protocol-aware, and target-aware rule metadata.
-- UI includes dashboard cards, focus animations, profile selector, connection trees, filters, quarantine controls, timed app decision prompts, target rule actions, notification history, import/export, tray behavior, and startup settings.
-- The `service/` crate is present as the staged home for a future boot-time/default-deny Windows service.
+- UI includes dashboard cards, focus animations, profile selector, connection trees, filters, quarantine controls, timed app decision prompts, target rule actions, notification history, service controls, import/export, tray behavior, and startup settings.
+- The `service/` crate runs as a Windows service, reloads `state.json`, applies allow/block rules, and installs default-deny outbound filters when the active profile/settings require it.
 
 _TR: Proje çalışır durumda; güvenlik davranışları ve UI akışı hâlâ geliştirilmeye açık._
 
@@ -138,13 +143,12 @@ _TR: Proje çalışır durumda; güvenlik davranışları ve UI akışı hâlâ 
 
 V2 foundations have landed. The next staged upgrades are:
 
-- Implement the Windows service install/start UX and move default-deny enforcement into that always-on service.
-- Enforce app+target rules directly in WFP with remote address/port conditions instead of app-wide fallback blocks.
 - Add real executable icons by extracting Windows shell icons and caching them as app metadata.
 - Add DNS cache correlation and reverse-DNS history so IPs can be mapped to known domains when Windows can prove the relationship.
 - Add real signature/publisher checks for stronger offline reputation labels.
 - Add optional online reputation providers behind explicit API keys.
 - Add per-application byte counters once packet/flow byte telemetry is available.
+- Add installer bundling for `m0untain-service.exe` so release users do not need to build/copy the service binary manually.
 
 _TR: Bunlar projeyi daha gerçek bir “tam kontrol firewall” hissine taşıyacak sonraki adımlar._
 
@@ -156,6 +160,6 @@ _TR: Bunlar projeyi daha gerçek bir “tam kontrol firewall” hissine taşıya
 - Timed rules are pruned automatically when they expire and emit history events.
 - Online reputation is off by default; the current risk model is offline-first.
 - If the service is offline, m0untain clearly reports "app-only protection" and continues with UI-session WFP controls.
-- The first observed connection may already have reached Windows before a user decision is made; stronger pre-connection default-deny behavior should be implemented as a dedicated service/filter strategy.
+- The first observed connection may already have reached Windows before a user decision is made in app-only mode; service-backed default-deny is the stronger pre-connection strategy.
 
 _TR: En güçlü güvenlik için sonraki büyük adım, uygulama açılmadan da çalışan servis tabanlı default-deny mimarisi olacaktır._

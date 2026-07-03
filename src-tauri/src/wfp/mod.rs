@@ -16,6 +16,12 @@ pub enum AppProtocol {
     Udp,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum RemoteMatch {
+    Ip(IpAddr),
+    Cidr { network: IpAddr, prefix: u8 },
+}
+
 /// A raw connection observation from the OS network stack, before it is turned
 /// into a `sentinel_core::NetEvent`.
 #[derive(Debug, Clone)]
@@ -42,6 +48,18 @@ pub trait Firewall: Send + Sync + 'static {
     fn block_ip(&self, ip: IpAddr) -> Result<u64, String>;
     /// Block future outbound connections for an application.
     fn block_app(&self, app_id: &[u8], protocol: AppProtocol) -> Result<u64, String>;
+    /// Block future outbound connections for an app, optionally scoped to a
+    /// remote IP/CIDR and/or remote port.
+    fn block_app_target(
+        &self,
+        app_id: &[u8],
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<u64, String> {
+        let _ = (remote, remote_port);
+        self.block_app(app_id, protocol)
+    }
     /// Remove a previously installed block.
     fn unblock(&self, handle: u64) -> Result<(), String>;
     /// Human-readable backend name for the UI ("WFP" or "Simulator").

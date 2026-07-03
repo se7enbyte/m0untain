@@ -392,6 +392,12 @@
           <div class="history-stat"><small>blocks</small><b id="hist-blocks">0</b></div>
         </div>
         <div class="backend-note show" id="service-note" style="display:block;margin-top:12px"></div>
+        <div class="qactions" style="margin-top:10px;justify-content:flex-end">
+          <button class="tinybtn allow" data-service-action="install">Install / update</button>
+          <button class="tinybtn allow" data-service-action="start">Start</button>
+          <button class="tinybtn danger" data-service-action="stop">Stop</button>
+          <button class="tinybtn danger" data-service-action="uninstall">Uninstall</button>
+        </div>
       </div>
       <div class="panel">
         <div class="p-head"><div class="p-title"><span class="ey">audit trail</span>Prompts, Decisions, Expiry</div></div>
@@ -833,7 +839,8 @@ function refreshBackendStatus(){
   const service=document.getElementById('service-note');
   if(service){
     const status=state.serviceStatus||{};
-    service.textContent=status.message||'Windows service design is staged; current enforcement is app-only while m0untain is running.';
+    const suffix=status.pid?` PID ${status.pid}`:'';
+    service.textContent=(status.message||'Windows service is not installed; current enforcement is app-only while m0untain is running.')+suffix;
   }
 }
 function syncProfileSelectors(){
@@ -871,10 +878,27 @@ function paintNotifications(){
     return `<div class="history-row"><span class="history-kind">${esc(r.kind||'event')}</span><div><b>${esc(r.title||'m0untain event')}</b><small>${esc(body||'—')}</small></div><small>${esc(ts)}</small></div>`;
   }).join(''):'<div class="empty">Henüz notification history yok.</div>';
 }
+async function refreshServiceStatus(){
+  if(hasTauriApi){
+    state.serviceStatus=await window.__TAURI__.core.invoke('get_service_status');
+    refreshBackendStatus();
+  }
+}
+async function handleServiceAction(action){
+  if(!hasTauriApi)return;
+  const command={install:'install_service',start:'start_service',stop:'stop_service',uninstall:'uninstall_service'}[action];
+  if(!command)return;
+  await window.__TAURI__.core.invoke(command);
+  await refreshServiceStatus();
+}
 document.getElementById('profile-select')?.addEventListener('change',async e=>{
   state.activeProfileId=e.target.value;state.appSettings.activeProfileId=e.target.value;
   if(hasTauriApi)await window.__TAURI__.core.invoke('set_active_profile',{profileId:e.target.value}).catch(console.error);
   syncProfileSelectors();paintConnections();
+});
+document.getElementById('notifications-view')?.addEventListener('click',e=>{
+  const button=e.target.closest('[data-service-action]');
+  if(button)handleServiceAction(button.dataset.serviceAction).catch(error=>alert(error));
 });
 async function applyConfig(){
   const num=(id,fallback)=>Math.max(1,parseInt(document.getElementById(id)?.value||fallback,10)||fallback);

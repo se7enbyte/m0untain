@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use super::{AppProtocol, Firewall, RawConn};
+use super::{AppProtocol, Firewall, RawConn, RemoteMatch};
 
 fn now_ms() -> u64 {
     SystemTime::now()
@@ -37,6 +37,15 @@ impl Firewall for SimFirewall {
         Ok(self.next_handle.fetch_add(1, Ordering::Relaxed))
     }
     fn block_app(&self, _app_id: &[u8], _protocol: AppProtocol) -> Result<u64, String> {
+        Ok(self.next_handle.fetch_add(1, Ordering::Relaxed))
+    }
+    fn block_app_target(
+        &self,
+        _app_id: &[u8],
+        _protocol: AppProtocol,
+        _remote: Option<RemoteMatch>,
+        _remote_port: Option<u16>,
+    ) -> Result<u64, String> {
         Ok(self.next_handle.fetch_add(1, Ordering::Relaxed))
     }
     fn unblock(&self, _handle: u64) -> Result<(), String> {
