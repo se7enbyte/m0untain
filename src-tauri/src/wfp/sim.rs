@@ -106,6 +106,9 @@ fn run(tx: Sender<RawConn>) {
                 pid: 1000 + r.upto(400) as u32,
                 app_id: None,
                 app_path: None,
+                app_package_sid: None,
+                app_package_sid_string: None,
+                app_name: None,
             });
         }
 
@@ -140,6 +143,9 @@ fn run(tx: Sender<RawConn>) {
                         pid: 0,
                         app_id: None,
                         app_path: None,
+                        app_package_sid: None,
+                        app_package_sid_string: None,
+                        app_name: None,
                     });
                 }
                 *left -= 1;
@@ -160,6 +166,9 @@ fn run(tx: Sender<RawConn>) {
                         pid: 0,
                         app_id: None,
                         app_path: None,
+                        app_package_sid: None,
+                        app_package_sid_string: None,
+                        app_name: None,
                     });
                     *port = port.wrapping_add(1).max(1);
                 }

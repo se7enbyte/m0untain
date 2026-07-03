@@ -83,6 +83,7 @@ struct AppQuarantine {
 struct PendingProgram {
     prompt: ProgramPrompt,
     app_id: Vec<u8>,
+    app_package_sid: Vec<u8>,
     temporary_handle: Option<u64>,
 }
 
@@ -100,6 +101,7 @@ struct KnownApp {
     app_path: String,
     app_name: String,
     app_id: Vec<u8>,
+    app_package_sid: Vec<u8>,
 }
 
 struct DisabledFirewall {
@@ -131,6 +133,10 @@ impl Firewall for DisabledFirewall {
     }
 
     fn block_app(&self, _app_id: &[u8], _protocol: AppProtocol) -> Result<u64, String> {
+        Err(self.message.clone())
+    }
+
+    fn block_package(&self, _package_sid: &[u8], _protocol: AppProtocol) -> Result<u64, String> {
         Err(self.message.clone())
     }
 
@@ -176,7 +182,7 @@ impl Shared {
             remote_ip: raw.remote_ip,
             remote_port: raw.remote_port,
             pid: raw.pid,
-            app_path: raw.app_path.clone(),
+            app_path: raw_app_path(raw),
             service_sid: None,
             is_new_conn: raw.is_new,
             action: Action::Allow,
@@ -200,10 +206,46 @@ fn app_key(path: &str) -> String {
 }
 
 fn app_name(path: &str) -> String {
+    if let Some(package_sid) = path.strip_prefix("package:") {
+        return format!("Packaged app {}", shorten_sid(package_sid));
+    }
     path.rsplit(['\\', '/'])
         .find(|part| !part.is_empty())
         .unwrap_or(path)
         .to_string()
+}
+
+fn shorten_sid(value: &str) -> String {
+    if value.len() <= 18 {
+        value.to_string()
+    } else {
+        format!(
+            "{}…{}",
+            &value[..8],
+            &value[value.len().saturating_sub(8)..]
+        )
+    }
+}
+
+fn raw_app_path(raw: &RawConn) -> Option<String> {
+    raw.app_path
+        .as_deref()
+        .filter(|path| !path.trim().is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            raw.app_package_sid_string
+                .as_deref()
+                .filter(|sid| !sid.trim().is_empty())
+                .map(|sid| format!("package:{sid}"))
+        })
+}
+
+fn raw_app_name(raw: &RawConn, app_path: &str) -> String {
+    raw.app_name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| app_name(app_path))
 }
 
 fn normalize_protocol(value: &str) -> String {
@@ -347,8 +389,8 @@ fn install_block_for_rule(
     rule_key: &str,
     rule: &ProgramRule,
 ) -> Result<(), String> {
-    if rule.app_id.is_empty() {
-        return Err("rule has no WFP application id".to_string());
+    if rule.app_id.is_empty() && rule.app_package_sid.is_empty() {
+        return Err("rule has no WFP application or package id".to_string());
     }
     if is_domain_target(&rule.target) {
         return Ok(());
@@ -356,7 +398,15 @@ fn install_block_for_rule(
     let protocol = parse_protocol(&rule.protocol).unwrap_or(AppProtocol::All);
     let remote = remote_match_from_target(&rule.target)?;
     let remote_port = rule.target.as_ref().and_then(|target| target.port);
-    let handle = if remote.is_some() || remote_port.is_some() {
+    let handle = if !rule.app_package_sid.is_empty() {
+        if remote.is_some() || remote_port.is_some() {
+            shared
+                .fw
+                .block_package_target(&rule.app_package_sid, protocol, remote, remote_port)?
+        } else {
+            shared.fw.block_package(&rule.app_package_sid, protocol)?
+        }
+    } else if remote.is_some() || remote_port.is_some() {
         shared
             .fw
             .block_app_target(&rule.app_id, protocol, remote, remote_port)?
@@ -407,9 +457,10 @@ fn direction_matches(rule_direction: &str, observed_direction: &str) -> bool {
     rule_direction == "both" || observed_direction == "both" || rule_direction == observed_direction
 }
 
-fn app_matches(rule: &ProgramRule, key: &str, app_id: &[u8]) -> bool {
+fn app_matches(rule: &ProgramRule, key: &str, app_id: &[u8], app_package_sid: &[u8]) -> bool {
     (!rule.app_path.trim().is_empty() && app_key(&rule.app_path) == key)
         || (!rule.app_id.is_empty() && rule.app_id == app_id)
+        || (!rule.app_package_sid.is_empty() && rule.app_package_sid == app_package_sid)
 }
 
 fn ip_in_cidr(remote_ip: IpAddr, cidr: &str) -> bool {
@@ -503,6 +554,11 @@ fn rule_score(
         4
     } else if profile == GLOBAL_PROFILE_ID {
         5
+    } else if target_rank == 1 {
+        // Backward compatibility for prompt-created app-wide rules that were
+        // stored under the active profile before app decisions became global.
+        // Target-specific rules remain profile-bound.
+        6
     } else {
         return None;
     };
@@ -513,6 +569,7 @@ fn find_rule_in(
     rules: &HashMap<String, ProgramRule>,
     key: &str,
     app_id: &[u8],
+    app_package_sid: &[u8],
     protocol: &str,
     direction: &str,
     remote_ip: Option<IpAddr>,
@@ -523,7 +580,7 @@ fn find_rule_in(
 ) -> Option<(String, ProgramRule)> {
     let mut best: Option<(String, ProgramRule, (u8, u8, u64))> = None;
     for (rule_key, rule) in rules {
-        if !app_matches(rule, key, app_id)
+        if !app_matches(rule, key, app_id, app_package_sid)
             || !protocol_matches(&rule.protocol, protocol)
             || !direction_matches(&rule.direction, direction)
             || !target_matches(&rule.target, remote_ip, remote_port)
@@ -545,14 +602,30 @@ fn find_rule_in(
     best.map(|(rule_key, rule, _)| (rule_key, rule))
 }
 
-fn find_program_rule(shared: &Shared, key: &str, app_id: &[u8]) -> Option<(String, ProgramRule)> {
-    find_program_rule_for(shared, key, app_id, "all", "outbound", None, 0, now_ms())
+fn find_program_rule(
+    shared: &Shared,
+    key: &str,
+    app_id: &[u8],
+    app_package_sid: &[u8],
+) -> Option<(String, ProgramRule)> {
+    find_program_rule_for(
+        shared,
+        key,
+        app_id,
+        app_package_sid,
+        "all",
+        "outbound",
+        None,
+        0,
+        now_ms(),
+    )
 }
 
 fn find_program_rule_for(
     shared: &Shared,
     key: &str,
     app_id: &[u8],
+    app_package_sid: &[u8],
     protocol: &str,
     direction: &str,
     remote_ip: Option<IpAddr>,
@@ -569,6 +642,7 @@ fn find_program_rule_for(
         &shared.session_program_rules.lock().unwrap(),
         key,
         app_id,
+        app_package_sid,
         protocol,
         direction,
         remote_ip,
@@ -582,6 +656,7 @@ fn find_program_rule_for(
             &shared.program_rules.lock().unwrap(),
             key,
             app_id,
+            app_package_sid,
             protocol,
             direction,
             remote_ip,
@@ -593,21 +668,29 @@ fn find_program_rule_for(
     })
 }
 
-fn has_pending_program(shared: &Shared, key: &str, app_id: &[u8]) -> bool {
+fn has_pending_program(shared: &Shared, key: &str, app_id: &[u8], app_package_sid: &[u8]) -> bool {
     let pending = shared.pending_programs.lock().unwrap();
     pending.contains_key(key)
-        || pending
-            .values()
-            .any(|pending| !pending.app_id.is_empty() && pending.app_id == app_id)
+        || pending.values().any(|pending| {
+            (!pending.app_id.is_empty() && pending.app_id == app_id)
+                || (!pending.app_package_sid.is_empty()
+                    && pending.app_package_sid == app_package_sid)
+        })
 }
 
-fn remove_rules_with_app_id(rules: &mut HashMap<String, ProgramRule>, key: &str, app_id: &[u8]) {
+fn remove_rules_with_identity(
+    rules: &mut HashMap<String, ProgramRule>,
+    key: &str,
+    app_id: &[u8],
+    app_package_sid: &[u8],
+) {
     let duplicates: Vec<String> = rules
         .iter()
         .filter(|(rule_key, rule)| {
             rule_key.as_str() == key
-                || app_matches(rule, key, app_id)
+                || app_matches(rule, key, app_id, app_package_sid)
                 || (!rule.app_id.is_empty() && rule.app_id == app_id)
+                || (!rule.app_package_sid.is_empty() && rule.app_package_sid == app_package_sid)
         })
         .map(|(rule_key, _)| rule_key.clone())
         .collect();
@@ -646,24 +729,23 @@ fn protocol_str(raw: &RawConn) -> &'static str {
 }
 
 fn remember_known_app(shared: &Shared, raw: &RawConn) {
-    let Some(path) = raw
-        .app_path
-        .as_deref()
-        .filter(|path| !path.trim().is_empty())
-    else {
+    let Some(path) = raw_app_path(raw) else {
         return;
     };
-    let Some(app_id) = raw.app_id.as_ref().filter(|id| !id.is_empty()) else {
+    let app_id = raw.app_id.clone().unwrap_or_default();
+    let app_package_sid = raw.app_package_sid.clone().unwrap_or_default();
+    if app_id.is_empty() && app_package_sid.is_empty() {
         return;
-    };
+    }
 
-    let key = app_key(path);
+    let key = app_key(&path);
     shared.known_apps.lock().unwrap().insert(
         key,
         KnownApp {
-            app_path: path.to_string(),
-            app_name: app_name(path),
-            app_id: app_id.clone(),
+            app_name: raw_app_name(raw, &path),
+            app_path: path,
+            app_id,
+            app_package_sid,
         },
     );
 }
@@ -735,12 +817,16 @@ fn state_has_block_history_for_app(shared: &Shared, key: &str) -> bool {
 }
 
 fn risk_labels_for_raw(shared: &Shared, raw: &RawConn) -> Vec<String> {
-    let key = raw.app_path.as_deref().map(app_key).unwrap_or_default();
-    let has_rule = raw.app_id.as_ref().is_some_and(|app_id| {
+    let app_path = raw_app_path(raw);
+    let key = app_path.as_deref().map(app_key).unwrap_or_default();
+    let app_id = raw.app_id.as_deref().unwrap_or(&[]);
+    let package_sid = raw.app_package_sid.as_deref().unwrap_or(&[]);
+    let has_rule = (!app_id.is_empty() || !package_sid.is_empty() || !key.is_empty()) && {
         find_program_rule_for(
             shared,
             &key,
             app_id,
+            package_sid,
             protocol_str(raw),
             if raw.inbound { "inbound" } else { "outbound" },
             Some(raw.remote_ip),
@@ -748,7 +834,7 @@ fn risk_labels_for_raw(shared: &Shared, raw: &RawConn) -> Vec<String> {
             now_ms(),
         )
         .is_some()
-    });
+    };
     let had_block_history = shared
         .program_rules
         .lock()
@@ -756,7 +842,7 @@ fn risk_labels_for_raw(shared: &Shared, raw: &RawConn) -> Vec<String> {
         .values()
         .any(|rule| app_key(&rule.app_path) == key && rule.is_blocking());
     risk_labels_for(
-        raw.app_path.as_deref(),
+        app_path.as_deref(),
         raw.remote_port,
         has_rule,
         had_block_history,
@@ -768,18 +854,19 @@ fn connection_seen(raw: &RawConn, verdict: &Verdict, risk_labels: Vec<String>) -
         Verdict::Pass => ("allow".to_string(), None),
         Verdict::Block { reason, .. } => ("block".to_string(), Some(format!("{reason:?}"))),
     };
+    let app_path = raw_app_path(raw);
+    let app_name = app_path
+        .as_deref()
+        .map(|path| raw_app_name(raw, path))
+        .unwrap_or_else(|| format!("pid {}", raw.pid));
     ConnectionSeen {
         id: format!(
             "{}-{}-{}-{}",
             raw.ts_ms, raw.pid, raw.remote_ip, raw.remote_port
         ),
         ts_ms: raw.ts_ms,
-        app_path: raw.app_path.clone(),
-        app_name: raw
-            .app_path
-            .as_deref()
-            .map(app_name)
-            .unwrap_or_else(|| format!("pid {}", raw.pid)),
+        app_path,
+        app_name,
         direction: if raw.inbound { "inbound" } else { "outbound" }.to_string(),
         protocol: protocol_str(raw).to_string(),
         remote_ip: raw.remote_ip.to_string(),
@@ -806,6 +893,9 @@ fn active_to_raw(conn: &ActiveConnection, ts_ms: u64) -> RawConn {
         pid: conn.pid,
         app_id,
         app_path: conn.app_path.clone(),
+        app_package_sid: None,
+        app_package_sid_string: None,
+        app_name: Some(conn.app_name.clone()),
     }
 }
 
@@ -1257,6 +1347,7 @@ fn state_snapshot(state: &Arc<Shared>) -> serde_json::Value {
                 "appPath": rule.app_path,
                 "appName": rule.app_name,
                 "appId": rule.app_id,
+                "appPackageSid": rule.app_package_sid,
                 "decision": rule.decision,
                 "protocol": rule.protocol,
                 "direction": rule.direction,
@@ -1280,6 +1371,7 @@ fn state_snapshot(state: &Arc<Shared>) -> serde_json::Value {
                 "appPath": rule.app_path,
                 "appName": rule.app_name,
                 "appId": rule.app_id,
+                "appPackageSid": rule.app_package_sid,
                 "decision": rule.decision,
                 "protocol": rule.protocol,
                 "direction": rule.direction,
@@ -1364,7 +1456,11 @@ fn decide_program(
         let _ = state.fw.unblock(handle);
     }
     if decision == "quarantine" || decision == "block" {
-        let handle = state.fw.block_app(&pending.app_id, scope)?;
+        let handle = if !pending.app_package_sid.is_empty() {
+            state.fw.block_package(&pending.app_package_sid, scope)?
+        } else {
+            state.fw.block_app(&pending.app_id, scope)?
+        };
         state.app_blocks.lock().unwrap().insert(
             request_id.clone(),
             RuntimeAppBlock {
@@ -1378,7 +1474,6 @@ fn decide_program(
     }
 
     let now = now_ms();
-    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
     let expires_at_ms = duration_minutes.map(|minutes| {
         now.saturating_add(if minutes == 0 {
             30_000
@@ -1390,12 +1485,13 @@ fn decide_program(
         app_path: pending.prompt.app_path,
         app_name: pending.prompt.app_name,
         app_id: pending.app_id,
+        app_package_sid: pending.app_package_sid,
         decision: decision.clone(),
         protocol: normalize_protocol(&protocol),
         direction: pending.prompt.direction,
         target: None,
         expires_at_ms,
-        profile_id: active_profile_id,
+        profile_id: GLOBAL_PROFILE_ID.to_string(),
         created_at_ms: now,
         updated_at_ms: now,
     };
@@ -1404,17 +1500,27 @@ fn decide_program(
     if remember {
         {
             let mut session_rules = state.session_program_rules.lock().unwrap();
-            remove_rules_with_app_id(&mut session_rules, &app_key, &rule.app_id);
+            remove_rules_with_identity(
+                &mut session_rules,
+                &app_key,
+                &rule.app_id,
+                &rule.app_package_sid,
+            );
         }
         {
             let mut rules = state.program_rules.lock().unwrap();
-            remove_rules_with_app_id(&mut rules, &app_key, &rule.app_id);
+            remove_rules_with_identity(&mut rules, &app_key, &rule.app_id, &rule.app_package_sid);
             rules.insert(key, rule);
         }
         state.save()?;
     } else {
         let mut session_rules = state.session_program_rules.lock().unwrap();
-        remove_rules_with_app_id(&mut session_rules, &app_key, &rule.app_id);
+        remove_rules_with_identity(
+            &mut session_rules,
+            &app_key,
+            &rule.app_id,
+            &rule.app_package_sid,
+        );
         session_rules.insert(key, rule);
     }
     push_notification(
@@ -1429,7 +1535,7 @@ fn decide_program(
                 format!("Timed decision for {minutes} minutes")
             }
         } else if remember {
-            "Remembered as a profile rule".to_string()
+            "Remembered as a global app rule".to_string()
         } else {
             "Session-only rule".to_string()
         },
@@ -1460,9 +1566,10 @@ fn set_program_rule_decision(
     let key = app_key(&app_path);
     let known = state.known_apps.lock().unwrap().get(&key).cloned();
     let now = now_ms();
-    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
     let (rule_key, mut rule) = if let Some(known) = known {
-        if let Some((rule_key, rule)) = find_program_rule(&state, &key, &known.app_id) {
+        if let Some((rule_key, rule)) =
+            find_program_rule(&state, &key, &known.app_id, &known.app_package_sid)
+        {
             (rule_key, rule)
         } else {
             (
@@ -1471,12 +1578,13 @@ fn set_program_rule_decision(
                     app_path: known.app_path,
                     app_name: known.app_name,
                     app_id: known.app_id,
+                    app_package_sid: known.app_package_sid,
                     decision: "allow".to_string(),
                     protocol: "all".to_string(),
                     direction: "outbound".to_string(),
                     target: None,
                     expires_at_ms: None,
-                    profile_id: active_profile_id.clone(),
+                    profile_id: GLOBAL_PROFILE_ID.to_string(),
                     created_at_ms: now,
                     updated_at_ms: now,
                 },
@@ -1500,20 +1608,21 @@ fn set_program_rule_decision(
     rule.decision = decision;
     rule.protocol = normalize_protocol(&protocol);
     rule.direction = normalize_direction(&rule.direction);
-    rule.profile_id = if rule.profile_id.trim().is_empty() {
-        active_profile_id
-    } else {
-        rule.profile_id
-    };
+    rule.profile_id = GLOBAL_PROFILE_ID.to_string();
     rule.updated_at_ms = now;
     let storage_key = rule_storage_key(&rule);
     {
         let mut session_rules = state.session_program_rules.lock().unwrap();
-        remove_rules_with_app_id(&mut session_rules, &rule_key, &rule.app_id);
+        remove_rules_with_identity(
+            &mut session_rules,
+            &rule_key,
+            &rule.app_id,
+            &rule.app_package_sid,
+        );
     }
     {
         let mut rules = state.program_rules.lock().unwrap();
-        remove_rules_with_app_id(&mut rules, &rule_key, &rule.app_id);
+        remove_rules_with_identity(&mut rules, &rule_key, &rule.app_id, &rule.app_package_sid);
         rules.insert(storage_key, rule);
     }
     state.save()
@@ -1617,6 +1726,7 @@ fn upsert_rule(
             .cloned()
         {
             rule.app_id = known.app_id;
+            rule.app_package_sid = known.app_package_sid;
         } else if let Some(app_id) = wfp::app_id_from_path(&rule.app_path) {
             rule.app_id = app_id;
         }
@@ -1624,7 +1734,7 @@ fn upsert_rule(
     let rule_id = rule_storage_key(&rule);
     let app_block_key = app_key(&rule.app_path);
 
-    if rule.is_blocking() && !rule.app_id.is_empty() {
+    if rule.is_blocking() && (!rule.app_id.is_empty() || !rule.app_package_sid.is_empty()) {
         install_block_for_rule(&state, &rule_id, &rule)?;
     } else if rule.decision == "allow" {
         remove_runtime_blocks_for_app(&state, &app_block_key);
@@ -1698,17 +1808,17 @@ fn set_timed_decision(
         .cloned()
         .ok_or_else(|| "program was not observed in this session yet".to_string())?;
     let now = now_ms();
-    let active_profile_id = state.app_settings.lock().unwrap().active_profile_id.clone();
     let rule = ProgramRule {
         app_path: known.app_path,
         app_name: known.app_name,
         app_id: known.app_id,
+        app_package_sid: known.app_package_sid,
         decision: normalize_decision(&decision)?,
         protocol: normalize_protocol(&protocol),
         direction: "outbound".to_string(),
         target: None,
         expires_at_ms: Some(now.saturating_add(minutes.max(1).saturating_mul(60_000))),
-        profile_id: active_profile_id,
+        profile_id: GLOBAL_PROFILE_ID.to_string(),
         created_at_ms: now,
         updated_at_ms: now,
     };
@@ -1941,6 +2051,7 @@ mod tests {
             app_path: "C:\\Tools\\demo.exe".to_string(),
             app_name: "demo.exe".to_string(),
             app_id: vec![1, 2, 3],
+            app_package_sid: Vec::new(),
             decision: decision.to_string(),
             protocol: "tcp".to_string(),
             direction: "outbound".to_string(),
@@ -1973,6 +2084,7 @@ mod tests {
             &rules,
             &app_key("C:\\Tools\\demo.exe"),
             &[1, 2, 3],
+            &[],
             "tcp",
             "outbound",
             Some("8.8.8.8".parse().unwrap()),
@@ -1993,6 +2105,34 @@ mod tests {
 
         assert!(rule_score(&timed, "home", false, 100).is_none());
         assert!(rule_score(&timed, "home", false, 98).is_some());
+    }
+
+    #[test]
+    fn legacy_app_rule_remains_effective_after_profile_switch() {
+        let legacy = rule("allow", "work", None);
+
+        assert_eq!(rule_score(&legacy, "gaming", false, 10).unwrap().0, 6);
+    }
+
+    #[test]
+    fn packaged_app_rule_matches_package_sid() {
+        let mut packaged = rule("block", GLOBAL_PROFILE_ID, None);
+        packaged.app_path = "package:S-1-15-2-1234".to_string();
+        packaged.app_id.clear();
+        packaged.app_package_sid = vec![1, 9, 8, 4];
+
+        assert!(app_matches(
+            &packaged,
+            &app_key("package:S-1-15-2-1234"),
+            &[],
+            &[1, 9, 8, 4]
+        ));
+        assert!(!app_matches(
+            &packaged,
+            &app_key("package:S-1-15-2-other"),
+            &[],
+            &[4, 8, 9, 1]
+        ));
     }
 
     #[test]
@@ -2085,17 +2225,16 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
     if raw.inbound {
         return;
     }
-    let Some(path) = raw
-        .app_path
-        .as_deref()
-        .filter(|path| !path.trim().is_empty())
-    else {
+    let Some(path) = raw_app_path(raw) else {
         return;
     };
-    let Some(app_id) = raw.app_id.as_ref().filter(|id| !id.is_empty()) else {
+    let app_id = raw.app_id.as_deref().unwrap_or(&[]);
+    let app_package_sid = raw.app_package_sid.as_deref().unwrap_or(&[]);
+    if app_id.is_empty() && app_package_sid.is_empty() {
         return;
-    };
-    let key = app_key(path);
+    }
+    let key = app_key(&path);
+    let display_name = raw_app_name(raw, &path);
 
     let protocol = protocol_str(raw);
     let direction = if raw.inbound { "inbound" } else { "outbound" };
@@ -2103,6 +2242,7 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         shared,
         &key,
         app_id,
+        app_package_sid,
         protocol,
         direction,
         Some(raw.remote_ip),
@@ -2126,7 +2266,7 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
     let should_prompt =
         settings.ask_new_apps || settings.default_deny_enabled || active_profile_default_deny;
     if !should_prompt
-        || has_pending_program(shared, &key, app_id)
+        || has_pending_program(shared, &key, app_id, app_package_sid)
         || shared.app_blocks.lock().unwrap().contains_key(&key)
     {
         return;
@@ -2134,11 +2274,18 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
 
     // User-mode WFP subscriptions observe classification after it happens. We
     // immediately quarantine future attempts, then ask the user for a rule.
-    let temporary_handle = shared.fw.block_app(app_id, AppProtocol::All).ok();
+    let temporary_handle = if !app_package_sid.is_empty() {
+        shared
+            .fw
+            .block_package(app_package_sid, AppProtocol::All)
+            .ok()
+    } else {
+        shared.fw.block_app(app_id, AppProtocol::All).ok()
+    };
     let prompt = ProgramPrompt {
         id: key.clone(),
-        app_path: path.to_string(),
-        app_name: app_name(path),
+        app_path: path.clone(),
+        app_name: display_name.clone(),
         direction: "outbound".to_string(),
         protocol: protocol.to_string(),
         remote_ip: raw.remote_ip.to_string(),
@@ -2151,7 +2298,8 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         key,
         PendingProgram {
             prompt: prompt.clone(),
-            app_id: app_id.clone(),
+            app_id: app_id.to_vec(),
+            app_package_sid: app_package_sid.to_vec(),
             temporary_handle,
         },
     );
@@ -2160,8 +2308,8 @@ fn inspect_program(shared: &Arc<Shared>, app: &tauri::AppHandle, raw: &RawConn) 
         Some(app),
         "prompt-shown",
         "New outbound app",
-        format!("{} wants to connect to {}", app_name(path), raw.remote_ip),
-        Some(path.to_string()),
+        format!("{} wants to connect to {}", display_name, raw.remote_ip),
+        Some(path),
         Some(raw.remote_ip.to_string()),
     );
     let _ = app.emit("program-connection-request", prompt);

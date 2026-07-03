@@ -24,9 +24,13 @@ use std::sync::mpsc::Sender;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use windows::core::{GUID, PCWSTR};
+use windows::core::{GUID, PCWSTR, PWSTR};
 use windows::Win32::Foundation::*;
 use windows::Win32::NetworkManagement::WindowsFilteringPlatform::*;
+use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
+use windows::Win32::Security::{
+    GetLengthSid, IsValidSid, LookupAccountSidW, PSID, SID, SID_NAME_USE,
+};
 use windows::Win32::System::Rpc::RPC_C_AUTHN_WINNT;
 
 use super::{AppProtocol, Firewall, RawConn, RemoteMatch};
@@ -60,6 +64,87 @@ pub fn app_id_from_path(path: &str) -> Option<Vec<u8>> {
     (!bytes.is_empty()).then_some(bytes)
 }
 
+unsafe fn sid_bytes(sid: *mut windows::Win32::Security::SID) -> Option<Vec<u8>> {
+    if sid.is_null() {
+        return None;
+    }
+    let psid = PSID(sid as *mut core::ffi::c_void);
+    if !IsValidSid(psid).as_bool() {
+        return None;
+    }
+    let len = GetLengthSid(psid);
+    if len == 0 {
+        return None;
+    }
+    Some(std::slice::from_raw_parts(sid as *const u8, len as usize).to_vec())
+}
+
+unsafe fn sid_string(sid: *mut windows::Win32::Security::SID) -> Option<String> {
+    if sid.is_null() {
+        return None;
+    }
+    let psid = PSID(sid as *mut core::ffi::c_void);
+    let mut ptr = PWSTR::null();
+    ConvertSidToStringSidW(psid, &mut ptr).ok()?;
+    if ptr.is_null() {
+        return None;
+    }
+    let mut len = 0usize;
+    while *ptr.0.add(len) != 0 {
+        len += 1;
+    }
+    let value = String::from_utf16_lossy(std::slice::from_raw_parts(ptr.0, len));
+    let _ = LocalFree(HLOCAL(ptr.0 as *mut core::ffi::c_void));
+    Some(value)
+}
+
+unsafe fn sid_account_name(sid: *mut windows::Win32::Security::SID) -> Option<String> {
+    if sid.is_null() {
+        return None;
+    }
+    let psid = PSID(sid as *mut core::ffi::c_void);
+    let mut name_len = 0u32;
+    let mut domain_len = 0u32;
+    let mut sid_use = SID_NAME_USE(0);
+    let _ = LookupAccountSidW(
+        PCWSTR::null(),
+        psid,
+        PWSTR::null(),
+        &mut name_len,
+        PWSTR::null(),
+        &mut domain_len,
+        &mut sid_use,
+    );
+    if name_len == 0 {
+        return None;
+    }
+    let mut name = vec![0u16; name_len as usize];
+    let mut domain = vec![0u16; domain_len as usize];
+    LookupAccountSidW(
+        PCWSTR::null(),
+        psid,
+        PWSTR(name.as_mut_ptr()),
+        &mut name_len,
+        PWSTR(domain.as_mut_ptr()),
+        &mut domain_len,
+        &mut sid_use,
+    )
+    .ok()?;
+    let clean = |buf: &[u16]| {
+        let end = buf.iter().position(|ch| *ch == 0).unwrap_or(buf.len());
+        String::from_utf16_lossy(&buf[..end])
+    };
+    let name = clean(&name);
+    let domain = clean(&domain);
+    if name.trim().is_empty() {
+        None
+    } else if domain.trim().is_empty() {
+        Some(name)
+    } else {
+        Some(format!("{domain}\\{name}"))
+    }
+}
+
 // Our own provider/sublayer GUIDs so we can find and clean up only our filters.
 const SUBLAYER_KEY: GUID = GUID::from_u128(0x6d0a_9f3e_11c4_47a8_9c2e_5b7a_1e0f_9c11);
 
@@ -78,6 +163,11 @@ pub struct WfpFirewall {
 // raw engine across threads except read-only for enum/delete under the lock.
 unsafe impl Send for WfpFirewall {}
 unsafe impl Sync for WfpFirewall {}
+
+enum WfpIdentity<'a> {
+    AppId(&'a [u8]),
+    PackageSid(&'a [u8]),
+}
 
 impl WfpFirewall {
     pub fn start(tx: Sender<RawConn>) -> Result<Self, String> {
@@ -160,37 +250,51 @@ impl WfpFirewall {
         Ok(id)
     }
 
-    /// Add an outbound ALE block for one application identifier.
-    unsafe fn add_app_block_filter(
+    /// Add an outbound ALE block for one application/package identifier.
+    unsafe fn add_identity_block_filter(
         &self,
-        app_id: &[u8],
+        identity: WfpIdentity<'_>,
         layer: GUID,
         protocol: AppProtocol,
         remote: Option<RemoteMatch>,
         remote_port: Option<u16>,
     ) -> Result<Option<u64>, String> {
-        if app_id.is_empty() || app_id.len() > u32::MAX as usize {
-            return Err("invalid WFP application identifier".to_string());
+        let identity_len = match identity {
+            WfpIdentity::AppId(app_id) => app_id.len(),
+            WfpIdentity::PackageSid(package_sid) => package_sid.len(),
+        };
+        if identity_len == 0 || identity_len > u32::MAX as usize {
+            return Err("invalid WFP application/package identifier".to_string());
         }
         if !target_matches_layer(remote, layer) {
             return Ok(None);
         }
 
-        let mut blob = FWP_BYTE_BLOB {
-            size: app_id.len() as u32,
-            data: app_id.as_ptr() as *mut u8,
-        };
+        let mut blob = FWP_BYTE_BLOB::default();
         let mut conditions = Vec::with_capacity(4);
         let mut v6_storage: FWP_BYTE_ARRAY16;
         let mut v4_mask_storage: FWP_V4_ADDR_AND_MASK;
         let mut v6_mask_storage: FWP_V6_ADDR_AND_MASK;
 
-        let mut app_condition = FWPM_FILTER_CONDITION0::default();
-        app_condition.fieldKey = FWPM_CONDITION_ALE_APP_ID;
-        app_condition.matchType = FWP_MATCH_EQUAL;
-        app_condition.conditionValue.r#type = FWP_BYTE_BLOB_TYPE;
-        app_condition.conditionValue.Anonymous.byteBlob = &mut blob;
-        conditions.push(app_condition);
+        let mut identity_condition = FWPM_FILTER_CONDITION0::default();
+        identity_condition.matchType = FWP_MATCH_EQUAL;
+        match identity {
+            WfpIdentity::AppId(app_id) => {
+                blob = FWP_BYTE_BLOB {
+                    size: app_id.len() as u32,
+                    data: app_id.as_ptr() as *mut u8,
+                };
+                identity_condition.fieldKey = FWPM_CONDITION_ALE_APP_ID;
+                identity_condition.conditionValue.r#type = FWP_BYTE_BLOB_TYPE;
+                identity_condition.conditionValue.Anonymous.byteBlob = &mut blob;
+            }
+            WfpIdentity::PackageSid(package_sid) => {
+                identity_condition.fieldKey = FWPM_CONDITION_ALE_PACKAGE_ID;
+                identity_condition.conditionValue.r#type = FWP_SID;
+                identity_condition.conditionValue.Anonymous.sid = package_sid.as_ptr() as *mut SID;
+            }
+        }
+        conditions.push(identity_condition);
 
         if let AppProtocol::Tcp | AppProtocol::Udp = protocol {
             let mut protocol_condition = FWPM_FILTER_CONDITION0::default();
@@ -275,6 +379,40 @@ impl WfpFirewall {
         }
         Ok(Some(id))
     }
+
+    unsafe fn add_app_block_filter(
+        &self,
+        app_id: &[u8],
+        layer: GUID,
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<Option<u64>, String> {
+        self.add_identity_block_filter(
+            WfpIdentity::AppId(app_id),
+            layer,
+            protocol,
+            remote,
+            remote_port,
+        )
+    }
+
+    unsafe fn add_package_block_filter(
+        &self,
+        package_sid: &[u8],
+        layer: GUID,
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<Option<u64>, String> {
+        self.add_identity_block_filter(
+            WfpIdentity::PackageSid(package_sid),
+            layer,
+            protocol,
+            remote,
+            remote_port,
+        )
+    }
 }
 
 fn ipv4_prefix_mask(prefix: u8) -> u32 {
@@ -339,6 +477,10 @@ impl Firewall for WfpFirewall {
         self.block_app_target(app_id, protocol, None, None)
     }
 
+    fn block_package(&self, package_sid: &[u8], protocol: AppProtocol) -> Result<u64, String> {
+        self.block_package_target(package_sid, protocol, None, None)
+    }
+
     fn block_app_target(
         &self,
         app_id: &[u8],
@@ -359,6 +501,51 @@ impl Firewall for WfpFirewall {
             }
             match self.add_app_block_filter(
                 app_id,
+                FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+                protocol,
+                remote,
+                remote_port,
+            ) {
+                Ok(Some(id)) => ids.push(id),
+                Ok(None) => {}
+                Err(error) => {
+                    for id in ids {
+                        let _ = FwpmFilterDeleteById0(self.engine, id);
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        if ids.is_empty() {
+            return Err("target does not match an ALE connect layer".to_string());
+        }
+        let mut next = self.next_handle.lock().unwrap();
+        let handle = *next;
+        *next += 1;
+        self.filters.lock().unwrap().insert(handle, ids);
+        Ok(handle)
+    }
+
+    fn block_package_target(
+        &self,
+        package_sid: &[u8],
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<u64, String> {
+        let mut ids = Vec::with_capacity(2);
+        unsafe {
+            if let Some(id) = self.add_package_block_filter(
+                package_sid,
+                FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+                protocol,
+                remote,
+                remote_port,
+            )? {
+                ids.push(id);
+            }
+            match self.add_package_block_filter(
+                package_sid,
                 FWPM_LAYER_ALE_AUTH_CONNECT_V6,
                 protocol,
                 remote,
@@ -505,6 +692,17 @@ unsafe extern "system" fn net_event_callback(
         (None, None)
     };
 
+    let (app_package_sid, app_package_sid_string, app_name) =
+        if h.flags & FWPM_NET_EVENT_FLAG_PACKAGE_ID_SET != 0 && !h.packageSid.is_null() {
+            (
+                sid_bytes(h.packageSid),
+                sid_string(h.packageSid),
+                sid_account_name(h.packageSid),
+            )
+        } else {
+            (None, None, None)
+        };
+
     let raw = RawConn {
         ts_ms: now_ms(),
         inbound,
@@ -516,6 +714,9 @@ unsafe extern "system" fn net_event_callback(
         pid: 0,
         app_id,
         app_path,
+        app_package_sid,
+        app_package_sid_string,
+        app_name,
     };
     if let Some(tx) = EVENT_TX.get() {
         let _ = tx.send(raw);

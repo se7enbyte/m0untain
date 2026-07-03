@@ -62,6 +62,7 @@ struct RuleTarget {
 struct ProgramRule {
     app_path: String,
     app_id: Vec<u8>,
+    app_package_sid: Vec<u8>,
     decision: String,
     protocol: String,
     direction: String,
@@ -169,6 +170,7 @@ mod windows_service {
     use windows::core::{GUID, PCWSTR, PWSTR};
     use windows::Win32::Foundation::*;
     use windows::Win32::NetworkManagement::WindowsFilteringPlatform::*;
+    use windows::Win32::Security::SID;
     use windows::Win32::System::Rpc::RPC_C_AUTHN_WINNT;
     use windows::Win32::System::Services::*;
 
@@ -367,15 +369,18 @@ mod windows_service {
             action: FWP_ACTION_TYPE,
             weight: u8,
         ) -> Result<(), String> {
-            if rule.app_id.is_empty() && rule.app_path.is_empty() {
+            if rule.app_id.is_empty() && rule.app_package_sid.is_empty() && rule.app_path.is_empty()
+            {
                 return Ok(());
             }
-            let app_id = if !rule.app_id.is_empty() {
-                rule.app_id.clone()
+            let identity = if !rule.app_package_sid.is_empty() {
+                WfpIdentity::PackageSid(rule.app_package_sid.clone())
+            } else if !rule.app_id.is_empty() {
+                WfpIdentity::AppId(rule.app_id.clone())
             } else {
-                app_id_from_path(&rule.app_path).unwrap_or_default()
+                WfpIdentity::AppId(app_id_from_path(&rule.app_path).unwrap_or_default())
             };
-            if app_id.is_empty() {
+            if identity.is_empty() {
                 return Ok(());
             }
             let remote = remote_match_from_target(&rule.target)?;
@@ -388,9 +393,9 @@ mod windows_service {
                     continue;
                 }
                 if let Some(id) = unsafe {
-                    add_app_filter(
+                    add_identity_filter(
                         self.engine,
-                        &app_id,
+                        &identity,
                         layer,
                         rule,
                         remote,
@@ -429,6 +434,20 @@ mod windows_service {
     enum RemoteMatch {
         Ip(IpAddr),
         Cidr { network: IpAddr, prefix: u8 },
+    }
+
+    #[derive(Debug, Clone)]
+    enum WfpIdentity {
+        AppId(Vec<u8>),
+        PackageSid(Vec<u8>),
+    }
+
+    impl WfpIdentity {
+        fn is_empty(&self) -> bool {
+            match self {
+                Self::AppId(value) | Self::PackageSid(value) => value.is_empty(),
+            }
+        }
     }
 
     fn remote_match_from_target(
@@ -480,9 +499,9 @@ mod windows_service {
         }
     }
 
-    unsafe fn add_app_filter(
+    unsafe fn add_identity_filter(
         engine: HANDLE,
-        app_id: &[u8],
+        identity: &WfpIdentity,
         layer: GUID,
         rule: &ProgramRule,
         remote: Option<RemoteMatch>,
@@ -493,21 +512,31 @@ mod windows_service {
         if !target_matches_layer(remote, layer) {
             return Ok(None);
         }
-        let mut blob = FWP_BYTE_BLOB {
-            size: app_id.len() as u32,
-            data: app_id.as_ptr() as *mut u8,
-        };
+        let mut blob = FWP_BYTE_BLOB::default();
         let mut conditions = Vec::with_capacity(4);
         let mut v6_storage: FWP_BYTE_ARRAY16;
         let mut v4_mask_storage: FWP_V4_ADDR_AND_MASK;
         let mut v6_mask_storage: FWP_V6_ADDR_AND_MASK;
 
-        let mut app_condition = FWPM_FILTER_CONDITION0::default();
-        app_condition.fieldKey = FWPM_CONDITION_ALE_APP_ID;
-        app_condition.matchType = FWP_MATCH_EQUAL;
-        app_condition.conditionValue.r#type = FWP_BYTE_BLOB_TYPE;
-        app_condition.conditionValue.Anonymous.byteBlob = &mut blob;
-        conditions.push(app_condition);
+        let mut identity_condition = FWPM_FILTER_CONDITION0::default();
+        identity_condition.matchType = FWP_MATCH_EQUAL;
+        match identity {
+            WfpIdentity::AppId(app_id) => {
+                blob = FWP_BYTE_BLOB {
+                    size: app_id.len() as u32,
+                    data: app_id.as_ptr() as *mut u8,
+                };
+                identity_condition.fieldKey = FWPM_CONDITION_ALE_APP_ID;
+                identity_condition.conditionValue.r#type = FWP_BYTE_BLOB_TYPE;
+                identity_condition.conditionValue.Anonymous.byteBlob = &mut blob;
+            }
+            WfpIdentity::PackageSid(package_sid) => {
+                identity_condition.fieldKey = FWPM_CONDITION_ALE_PACKAGE_ID;
+                identity_condition.conditionValue.r#type = FWP_SID;
+                identity_condition.conditionValue.Anonymous.sid = package_sid.as_ptr() as *mut SID;
+            }
+        }
+        conditions.push(identity_condition);
 
         match rule.protocol.as_str() {
             "tcp" | "udp" => {

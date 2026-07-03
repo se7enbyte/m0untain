@@ -39,6 +39,13 @@ pub struct RawConn {
     pub app_id: Option<Vec<u8>>,
     /// Human-readable path decoded from the WFP application identifier.
     pub app_path: Option<String>,
+    /// Package/AppContainer SID bytes for packaged apps (MSIX/UWP/Store apps).
+    pub app_package_sid: Option<Vec<u8>>,
+    /// Stable SID string, used as a synthetic app path when Windows does not
+    /// expose a normal executable path for a packaged app.
+    pub app_package_sid_string: Option<String>,
+    /// Best-effort display name derived from the package SID/account lookup.
+    pub app_name: Option<String>,
 }
 
 /// Installs and removes temporary block filters. Implementations must be
@@ -48,6 +55,8 @@ pub trait Firewall: Send + Sync + 'static {
     fn block_ip(&self, ip: IpAddr) -> Result<u64, String>;
     /// Block future outbound connections for an application.
     fn block_app(&self, app_id: &[u8], protocol: AppProtocol) -> Result<u64, String>;
+    /// Block future outbound connections for a packaged application.
+    fn block_package(&self, package_sid: &[u8], protocol: AppProtocol) -> Result<u64, String>;
     /// Block future outbound connections for an app, optionally scoped to a
     /// remote IP/CIDR and/or remote port.
     fn block_app_target(
@@ -59,6 +68,18 @@ pub trait Firewall: Send + Sync + 'static {
     ) -> Result<u64, String> {
         let _ = (remote, remote_port);
         self.block_app(app_id, protocol)
+    }
+    /// Block future outbound connections for a packaged app, optionally scoped
+    /// to a remote IP/CIDR and/or remote port.
+    fn block_package_target(
+        &self,
+        package_sid: &[u8],
+        protocol: AppProtocol,
+        remote: Option<RemoteMatch>,
+        remote_port: Option<u16>,
+    ) -> Result<u64, String> {
+        let _ = (remote, remote_port);
+        self.block_package(package_sid, protocol)
     }
     /// Remove a previously installed block.
     fn unblock(&self, handle: u64) -> Result<(), String>;

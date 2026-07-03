@@ -416,7 +416,7 @@
     <div class="connection-grid"><div class="conn-cell"><small>Yön</small><b id="prompt-direction"></b></div><div class="conn-cell"><small>Protokol</small><b id="prompt-protocol"></b></div><div class="conn-cell"><small>Hedef</small><b id="prompt-target"></b></div></div>
     <div class="warning-note" id="first-packet-note">İlk bağlantı olayı WFP tarafından sınıflandırıldıktan sonra görüldü; ilk paket geçmiş olabilir. Sonraki bağlantılar karar verilene kadar karantinada.</div>
     <div class="field"><label for="prompt-scope">Kararın uygulanacağı bağlantı tipi</label><select id="prompt-scope" data-testid="connection-scope"><option value="all">TCP + UDP (tümü)</option><option value="tcp">Yalnız TCP</option><option value="udp">Yalnız UDP</option></select></div>
-    <div class="field"><label for="prompt-duration">Karar süresi</label><select id="prompt-duration"><option value="remember">Remember / kalıcı profil kuralı</option><option value="once">Allow once (~30 sn)</option><option value="10">10 dakika</option><option value="60">1 saat</option><option value="session">Sadece bu oturum</option></select></div>
+    <div class="field"><label for="prompt-duration">Karar süresi</label><select id="prompt-duration"><option value="remember">Remember / global uygulama kuralı</option><option value="once">Allow once (~30 sn)</option><option value="10">10 dakika</option><option value="60">1 saat</option><option value="session">Sadece bu oturum</option></select></div>
     <label class="remember"><input type="checkbox" id="prompt-remember" checked> Bu kararı hatırla</label>
     <div class="actions"><button class="btn block" id="kill-prompt-btn">Kill process</button><button class="btn block" id="quarantine-btn" data-testid="quarantine-button">Karantinada tut</button><button class="btn allow" id="allow-btn" data-testid="allow-button">Bağlantıya izin ver</button></div>
   </div>
@@ -924,7 +924,11 @@ async function toggleSetting(key,el){
 function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function updateNotice(){const b=document.getElementById('notice-badge'),n=state.promptQueue.length+(state.activePrompt?1:0);b.textContent=n;b.classList.toggle('show',n>0);}
 function keyOf(path){return String(path||'').trim().toLowerCase();}
-function appNameFromPath(path){return String(path||'?').split(/[\\/]/).filter(Boolean).pop()||'?';}
+function appNameFromPath(path){
+  const value=String(path||'?');
+  if(value.toLowerCase().startsWith('package:'))return 'Packaged app '+value.slice(8,20)+'…';
+  return value.split(/[\\/]/).filter(Boolean).pop()||'?';
+}
 function protoLabel(p){return p==='tcp'?'TCP':p==='udp'?'UDP':'TCP+UDP';}
 function statusLabel(s){return s==='waiting'?'karar bekliyor':s==='session'?'oturum karantinası':s==='remembered'?'kayıtlı, uygulanacak':'karantinada';}
 function quarantineItems(){
@@ -1024,7 +1028,7 @@ async function decideProgram(decision){
   const durationMinutes=duration==='once'?0:(duration==='10'?10:(duration==='60'?60:null));
   if(hasTauriApi)await window.__TAURI__.core.invoke('decide_program',{requestId:p.id,decision,protocol,remember,durationMinutes});
   const expiresAtMs=durationMinutes==null?null:Date.now()+(durationMinutes===0?30000:durationMinutes*60000);
-  const localRule={appPath:p.appPath,appName:p.appName,decision,protocol,temporary:!remember,profileId:state.activeProfileId,expiresAtMs};
+  const localRule={appPath:p.appPath,appName:p.appName,decision,protocol,temporary:!remember,profileId:'global',expiresAtMs};
   state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
   state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(p.appPath));
   if(remember)state.programRules=state.programRules.concat([localRule]);
@@ -1130,7 +1134,7 @@ async function handleConnectionAction(button){
   const path=button.dataset.appPath,action=button.dataset.connAction;
   if(!path)return;
   if(hasTauriApi)await window.__TAURI__.core.invoke('set_program_rule_decision',{appPath:path,decision:action==='allow'?'allow':'quarantine',protocol:'all'});
-  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:action==='allow'?'allow':'quarantine',protocol:'all'}]);
+  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:action==='allow'?'allow':'quarantine',protocol:'all',profileId:'global'}]);
   state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));
   if(action!=='allow')state.appQuarantines.push({appPath:path,appName:appNameFromPath(path),protocol:'all',status:'enforced',active:true,temporary:false});
   paintQuarantine();paintRules();paintConnections();
@@ -1424,7 +1428,7 @@ async function handleConnectionAction(button){
   const group=applicationGroups().find(g=>keyOf(g.appPath)===keyOf(path));
   const appName=group?.name||appNameFromPath(path);
   if(hasTauriApi)await window.__TAURI__.core.invoke('set_program_rule_decision',{appPath:path,decision:action==='allow'?'allow':'quarantine',protocol:'all'});
-  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName,decision:action==='allow'?'allow':'quarantine',protocol:'all'}]);
+  state.programRules=state.programRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName,decision:action==='allow'?'allow':'quarantine',protocol:'all',profileId:'global'}]);
   state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path));
   state.appQuarantines=state.appQuarantines.filter(q=>keyOf(q.appPath)!==keyOf(path));
   if(action!=='allow')state.appQuarantines.push({appPath:path,appName,protocol:'all',status:'enforced',active:true,temporary:false});
@@ -1440,7 +1444,7 @@ async function handleTimedAllow(button){
   const path=button.dataset.appPath,minutes=parseInt(button.dataset.timedAllow||'10',10);
   if(!path)return;
   if(hasTauriApi)await window.__TAURI__.core.invoke('set_timed_decision',{appPath:path,decision:'allow',protocol:'all',minutes});
-  state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:'allow',protocol:'all',temporary:true,expiresAtMs:Date.now()+minutes*60000,profileId:state.activeProfileId}]);
+  state.sessionProgramRules=state.sessionProgramRules.filter(r=>keyOf(r.appPath)!==keyOf(path)).concat([{appPath:path,appName:appNameFromPath(path),decision:'allow',protocol:'all',temporary:true,expiresAtMs:Date.now()+minutes*60000,profileId:'global'}]);
   paintRules();paintConnections();
 }
 async function handleKillProcess(button){

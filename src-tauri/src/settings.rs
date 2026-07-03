@@ -56,6 +56,7 @@ pub struct ProgramRule {
     pub app_path: String,
     pub app_name: String,
     pub app_id: Vec<u8>,
+    pub app_package_sid: Vec<u8>,
     /// "allow", "block" or "quarantine".
     pub decision: String,
     /// "all", "tcp" or "udp".
@@ -75,6 +76,7 @@ impl Default for ProgramRule {
             app_path: String::new(),
             app_name: String::new(),
             app_id: Vec::new(),
+            app_package_sid: Vec::new(),
             decision: "allow".to_string(),
             protocol: "all".to_string(),
             direction: "outbound".to_string(),
